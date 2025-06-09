@@ -91,7 +91,6 @@ def is_openai_model(model_name: str) -> bool:
     openai_prefixes = (
         "gpt-",
         "gpt_image-",
-        "text-",
         "dall-e",
         "davinci",
         "babbage",
@@ -99,15 +98,12 @@ def is_openai_model(model_name: str) -> bool:
         "chatgpt",
         "tts-",
         "whisper-",
-        "computer-",
-        "text-embedding",
-        "omni",
     )
 
     if any(model.startswith(prefix) for prefix in openai_prefixes):
         return True
 
-    # Matches o models like "o1", "o1-preview", "o3-mini", "04-mini" etc.
+    # Matches o models like "o1", "o1-preview", "o3-mini", "o4-mini" etc.
     if re.match(r"^[o]\d", model):
         return True
 
