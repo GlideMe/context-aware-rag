@@ -3,7 +3,7 @@ langchain_core==0.3.21
 langchain==0.3.3
 langchain_community==0.3.2
 langchain_milvus==0.1.5
-langchain-openai==0.2.2
+langchain-openai>=0.2.3,<0.3.0
 langchain-experimental==0.3.2
 langchain-nvidia-ai-endpoints==0.3.7
 pymilvus==2.4.4
