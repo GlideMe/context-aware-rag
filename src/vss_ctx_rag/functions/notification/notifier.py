@@ -121,7 +121,7 @@ class Notifier(Function):
                     item["event"] for item in result["result"] if item["is_detected"]
                 ]
 
-                logger.info(f"Elad2 events_detected: {events_detected}}")
+                logger.info(f"Elad2 events_detected: {events_detected}")
 
                 if events_detected:
                     events_detected_str = " ".join(events_detected)
