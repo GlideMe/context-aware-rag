@@ -85,6 +85,8 @@ class Notifier(Function):
                 event = event_item["event_list"]
                 event_id = event_item["event_id"]
 
+                logger.debug(f"Elad1 event: {event}, doc: {doc}")
+
                 tasks.append(
                     self.pipeline.ainvoke(
                         {
@@ -118,6 +120,8 @@ class Notifier(Function):
                 events_detected = [
                     item["event"] for item in result["result"] if item["is_detected"]
                 ]
+
+                logger.debug(f"Elad2 events_detected: {events_detected}}")
 
                 if events_detected:
                     events_detected_str = " ".join(events_detected)
