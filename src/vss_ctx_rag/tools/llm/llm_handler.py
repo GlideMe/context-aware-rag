@@ -71,7 +71,6 @@ class ChatOpenAITool(LLMTool):
     ) -> None:
         if model and is_openai_model(model):
             base_url = ""
-            logger.info(f"First If OH1 {model}")
             super().__init__(
                 llm=ChatOpenAI(
                     model=model, api_key=api_key, base_url=base_url, **llm_params
@@ -82,7 +81,6 @@ class ChatOpenAITool(LLMTool):
                 )
             )
         elif model and "llama-3.1-70b-instruct" in model and "nvcf" in base_url:
-            logger.info(f"First If OH2")
             register_model(
                 Model(
                     id=model, model_type="chat", client="ChatNVIDIA", endpoint=base_url
@@ -98,7 +96,6 @@ class ChatOpenAITool(LLMTool):
                 )
             )
         else:
-            logger.info(f"First If OH3")
             super().__init__(
                 llm=ChatOpenAI(
                     model=model, api_key=api_key, base_url=base_url, **llm_params
