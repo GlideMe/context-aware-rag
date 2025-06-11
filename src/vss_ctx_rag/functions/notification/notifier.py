@@ -60,6 +60,7 @@ class Notifier(Function):
     events: list[dict]
 
     def setup(self):
+        logger.info("GIL_1: Notifier::setup")
         self.notification_tool = self.get_tool("notification_tool")
         self.events = (
             self.get_param("events", required=False)
@@ -73,9 +74,11 @@ class Notifier(Function):
         self.pipeline = self.prompt | self.get_tool(LLM_TOOL_NAME) | self.output_parser
 
     async def acall(self, state: dict):
+        logger.info("GIL_1: Notifier::acall")
         return await asyncio.sleep(0.001)
 
     async def aprocess_doc(self, doc: str, doc_i: int, doc_meta: dict):
+        logger.info("GIL_1: Notifier::aprocess_doc")
         # TODO: Ensure the output is proper. Ensure json load works.
         notifications = []
         tasks = []

@@ -56,6 +56,7 @@ class BatchSummarization(Function):
     metrics = SummaryMetrics()
 
     def setup(self):
+        logger.info("GIL_1: BatchSummarization::setup")
         # fixed params
         self.batch_prompt = ChatPromptTemplate.from_messages(
             [
@@ -104,6 +105,7 @@ class BatchSummarization(Function):
         self.enable_summary = True
 
     async def acall(self, state: dict):
+        logger.info("GIL_1: BatchSummarization::acall")
         """batch summarization function call
 
         Args:
@@ -302,6 +304,7 @@ class BatchSummarization(Function):
         return state
 
     async def aprocess_doc(self, doc: str, doc_i: int, doc_meta: dict):
+        logger.info("GIL_1: BatchSummarization::aprocess_doc")
         try:
             logger.info("Adding doc %d", doc_i)
             doc_meta.setdefault("is_first", False)
@@ -400,6 +403,7 @@ class BatchSummarization(Function):
             logger.error(e)
 
     async def areset(self, state: dict):
+        logger.info("GIL_1: BatchSummarization::areset")
         # TODO: use async method for drop data
         self.vector_db.drop_data(state["expr"])
         self.summary_start_time = None

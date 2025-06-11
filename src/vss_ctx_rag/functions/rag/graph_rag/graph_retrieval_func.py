@@ -44,6 +44,7 @@ class GraphRetrievalFunc(Function):
     metrics = GraphMetrics()
 
     def setup(self):
+        logger.info("GIL_1: inside GraphRetrievalFunc::setup")
         self.graph_db = self.get_tool("graph_db")
         self.chat_llm = self.get_tool(LLM_TOOL_NAME)
         self.top_k = (
@@ -77,6 +78,7 @@ class GraphRetrievalFunc(Function):
         self.regex_object = compile(r"<(\d+[.]\d+)>")
 
     async def acall(self, state: dict) -> dict:
+        logger.info("GIL_1: inside GraphRetrievalFunc::acall")
         try:
             question = state.get("question", "").strip()
             if not question:

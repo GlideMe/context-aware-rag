@@ -54,6 +54,7 @@ class GraphRetrieval:
         uuid="default",
         top_k=None,
     ):
+        logger.info("GIL_1: GraphRetrieval::__init__")
         self.chat_llm = llm
         self.graph_db = graph
         self.chat_history = ChatMessageHistory()
@@ -85,6 +86,7 @@ class GraphRetrieval:
         self.doc_retriever = self.create_document_retriever_chain(neo_4j_retriever)
 
     def create_neo4j_vector(self, index_name: str):
+        logger.info("GIL_1: GraphRetrieval::create_neo4j_vector")
         try:
             retrieval_query = VECTOR_GRAPH_SEARCH_QUERY
             keyword_index = "keyword"
@@ -112,10 +114,12 @@ class GraphRetrieval:
         return vector_db
 
     def debug_logs(self, state, message: str = "Debug logs"):
-        logger.debug(f"{message}: {state}")
+        logger.info("GIL_1: GraphRetrieval::debug_logs")
+        logger.debug(f"GIL_1: {message}: {state}")
         return state
 
     def get_neo4j_retriever(self):
+        logger.info("GIL_1: GraphRetrieval::get_neo4j_retriever")
         with TimeMeasure("GraphRetrieval/Neo4jRetriever", "blue"):
             try:
                 index_name = "vector"
@@ -142,6 +146,7 @@ class GraphRetrieval:
                 ) from e
 
     def create_document_retriever_chain(self, neo_4j_retriever):
+        logger.info("GIL_1: GraphRetrieval::create_document_retriever_chain")
         with TimeMeasure("GraphRetrieval/CreateDocRetChain", "blue"):
             try:
                 logger.info("Starting to create document retriever chain")
@@ -209,6 +214,7 @@ class GraphRetrieval:
                 raise
 
     def retrieve_documents(self):
+        logger.info("GIL_1: GraphRetrieval::retrieve_documents")
         with TimeMeasure("Retrive documents", "green"):
             try:
                 docs = self.doc_retriever.invoke(
@@ -223,6 +229,7 @@ class GraphRetrieval:
             return docs
 
     def fetch_documents(self, filter):
+        logger.info("GIL_1: GraphRetrieval::fetch_documents")
         """Fetch documents from graph database using a cypher query filter.
 
         Args:
@@ -244,6 +251,7 @@ class GraphRetrieval:
                 raise
 
     def format_documents(self, documents):
+        logger.info("GIL_1: GraphRetrieval::format_documents")
         prompt_token_cutoff = 28
         sorted_documents = sorted(
             documents,
@@ -278,6 +286,7 @@ class GraphRetrieval:
         return "\n\n".join(formatted_docs), sources, entities
 
     def get_sources_and_chunks(self, sources_used, docs):
+        logger.info("GIL_1: GraphRetrieval::get_sources_and_chunks")
         chunkdetails_list = []
         sources_used_set = set(sources_used)
         seen_ids_and_scores = set()
@@ -308,6 +317,7 @@ class GraphRetrieval:
         return result
 
     def process_documents(self, docs):
+        logger.info("GIL_1: GraphRetrieval::process_documents")
         with TimeMeasure("chat/process documents", "green"):
             try:
                 formatted_docs, sources, entitydetails = self.format_documents(docs)
@@ -326,12 +336,15 @@ class GraphRetrieval:
             return formatted_docs
 
     def add_message(self, message):
+        logger.info("GIL_1: GraphRetrieval::add_message")
         self.chat_history.add_message(message)
 
     def clear_chat_history(self):
+        logger.info("GIL_1: GraphRetrieval::clear_chat_history")
         self.chat_history.clear()
 
     def summarize_chat_history(self):
+        logger.info("GIL_1: GraphRetrieval::summarize_chat_history")
         summarization_thread = threading.Thread(
             target=self.summarize_chat_history_and_log,
             args=(self.chat_history.messages,),
@@ -339,6 +352,7 @@ class GraphRetrieval:
         summarization_thread.start()
 
     def get_response(self, question, formatted_docs):
+        logger.info("GIL_1: GraphRetrieval::get_response")
         return self.question_answering_chain.invoke(
             {
                 "messages": self.chat_history.messages[:-1],
@@ -348,6 +362,7 @@ class GraphRetrieval:
         )
 
     def summarize_chat_history_and_log(self, stored_messages):
+        logger.info("GIL_1: GraphRetrieval::summarize_chat_history_and_log")
         logger.info("Starting summarizing chat history in a separate thread.")
         if not stored_messages:
             logger.info("No messages to summarize.")

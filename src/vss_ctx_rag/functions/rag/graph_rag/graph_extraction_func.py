@@ -47,6 +47,7 @@ class GraphExtractionFunc(Function):
     metrics = GraphMetrics()
 
     def setup(self):
+        logger.info("GIL_1: GraphExtractionFunc::setup")
         self.graph_db = self.get_tool("graph_db")
         self.chat_llm = self.get_tool(LLM_TOOL_NAME)
         self.rag = self.get_param("rag")
@@ -81,6 +82,7 @@ class GraphExtractionFunc(Function):
         self.graph_create_start = None
 
     async def acall(self, state: dict):
+        logger.info("GIL_1: GraphExtractionFunc::acall")
         logger.debug(f"Graph Extraction Acall {state}")
         with TimeMeasure(
             "GraphRAG/Acall/graph-extraction/postprocessing", "green"
@@ -97,6 +99,7 @@ class GraphExtractionFunc(Function):
         return state
 
     async def aprocess_doc(self, doc: str, doc_i: int, doc_meta: Optional[dict] = None):
+        logger.info("GIL_1: GraphExtractionFunc::aprocess_doc")
         """QnA process doc call"""
         with TimeMeasure("GraphRAG/aprocess-doc:", "blue") as tm:
             if not doc_meta["is_last"]:
@@ -150,6 +153,7 @@ class GraphExtractionFunc(Function):
         return "Success"
 
     async def areset(self, state: dict):
+        logger.info("GIL_1: GraphExtractionFunc::areset")
         self.batcher.flush()
         self.graph_create_start = None
         self.graph_extraction.reset()
