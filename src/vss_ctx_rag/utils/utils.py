@@ -110,6 +110,31 @@ def is_openai_model(model_name: str) -> bool:
     return False
 
 
+def is_gemini_model(model_name: str) -> bool:
+    """Return True if the model name refers to a Google Gemini model."""
+
+    model = model_name.lower()
+
+    gemini_prefixes = (
+        "gemini-",
+        "models/gemini",
+    )
+
+    return any(model.startswith(prefix) for prefix in gemini_prefixes)
+
+
+def is_claude_model(model_name: str) -> bool:
+    """Return True if the model name refers to an Anthropic Claude model."""
+
+    model = model_name.lower()
+
+    claude_prefixes = (
+        "claude",
+    )
+
+    return any(model.startswith(prefix) for prefix in claude_prefixes)
+
+
 class RequestInfo:
     def __init__(
         self,
