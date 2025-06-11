@@ -8,7 +8,7 @@ Requires-Dist: langchain_core==0.3.21
 Requires-Dist: langchain==0.3.3
 Requires-Dist: langchain_community==0.3.2
 Requires-Dist: langchain_milvus==0.1.5
-Requires-Dist: langchain-openai==0.2.2
+Requires-Dist: langchain-openai>=0.2.3,<0.3.0
 Requires-Dist: langchain-experimental==0.3.2
 Requires-Dist: langchain-nvidia-ai-endpoints==0.3.7
 Requires-Dist: pymilvus==2.4.4
