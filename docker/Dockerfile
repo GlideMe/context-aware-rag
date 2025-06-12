@@ -20,6 +20,7 @@ RUN python3 -m pip install --user pipx \
 ENV PATH=/root/.local/bin:$PATH
 
 RUN pipx install uv
+pip install langchain-google-genai langchain-anthropic
 
 WORKDIR /app
 
