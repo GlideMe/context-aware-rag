@@ -14,8 +14,8 @@
 # limitations under the License.
 FROM python:3.12-bookworm
 
-RUN pipx install uv \
-    && pip install langchain-google-genai langchain-aws
+RUN pipx install uv
+    
 
 RUN python3 -m pip install --user pipx \
     && python3 -m pipx ensurepath
