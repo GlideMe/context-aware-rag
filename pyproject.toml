@@ -29,6 +29,11 @@ dependencies = [
   "langchain-openai>=0.2.3,<0.3.0",
   "langchain-experimental==0.3.2",
   "langchain-nvidia-ai-endpoints==0.3.7",
+<<<<<<< Updated upstream
+=======
+  "langchain-google-genai>=0.1.1,<0.2.0",
+  "langchain-aws>=0.1.1,<0.2.0",
+>>>>>>> Stashed changes
   "pymilvus==2.4.4",
   "pydantic==2.10.6",
   "uvicorn>=0.30.5,<0.31.0",
