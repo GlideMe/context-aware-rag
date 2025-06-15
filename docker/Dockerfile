@@ -19,12 +19,10 @@ RUN python3 -m pip install --user pipx \
 
 ENV PATH=/root/.local/bin:$PATH
 
-<<<<<<< Updated upstream
-RUN pipx install uv
-=======
+
 RUN pipx install uv \
     && pip install langchain-google-genai langchain-aws
->>>>>>> Stashed changes
+
 
 WORKDIR /app
 
