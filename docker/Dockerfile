@@ -14,12 +14,16 @@
 # limitations under the License.
 FROM python:3.12-bookworm
 
+RUN pipx install uv
+    
+
 RUN python3 -m pip install --user pipx \
     && python3 -m pipx ensurepath
 
 ENV PATH=/root/.local/bin:$PATH
 
-RUN pipx install uv
+
+
 
 WORKDIR /app
 
