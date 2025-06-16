@@ -330,6 +330,7 @@ class ContextManager:
                     "chunk_size": req_info.chunk_size,
                     "summary_duration": req_info.summary_duration,
                     "rag_type": req_info.rag_type,
+                    "endless_ai_enabled": req_info.endless_ai_enabled,
                 }
             )
         self.process.configure_update(config=config, req_info=req_info_obj)
