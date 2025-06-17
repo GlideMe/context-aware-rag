@@ -245,6 +245,9 @@ class ContextManagerHandler:
                 summ_config["prompts"]["summary_aggregation"] = (
                     summary_aggregation_prompt
                 )
+                if req_info:
+                    # Propagate endless AI mode to the summarization function
+                    summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
             except Exception as e:
                 raise ValueError("Prompt(s) missing!") from e
 
