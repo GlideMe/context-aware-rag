@@ -116,8 +116,9 @@ class ContextManagerHandler:
             api_key = os.getenv("OPENAI_API_KEY")
             return ChatOpenAITool(api_key=api_key, **llm_params)
         if is_claude_model(model_name):
-            api_key = os.getenv("CLAUDE_API_KEY")
-            return ChatClaudeTool(api_key=api_key, **llm_params)
+            # Claude models now use AWS Bedrock - no API key needed
+            # AWS credentials are handled via environment variables
+            return ChatClaudeTool(**llm_params)
         api_key = self.config.get("api_key")
         return ChatOpenAITool(api_key=api_key, **llm_params)
 
