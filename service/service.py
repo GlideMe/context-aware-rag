@@ -224,6 +224,7 @@ async def add_doc_from_dc(dc_file_path: DCFileRequest):
                 for _key, _val in vlm_chunk.items()
                 if _key != "vlm_response" and _key != "frame_times" and _key != "chunk"
             }
+            doc_meta["endless_ai_enabled"] = app_state.req_info.endless_ai_enabled
             app_state.ctx_mgr.add_doc(
                 vlm_chunk["vlm_response"],
                 doc_i=vlm_chunk["chunkIdx"],

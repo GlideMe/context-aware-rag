@@ -306,6 +306,7 @@ class BatchSummarization(Function):
             logger.info("Adding doc %d", doc_i)
             doc_meta.setdefault("is_first", False)
             doc_meta.setdefault("is_last", False)
+            doc_meta.setdefault("endless_ai_enabled", False)
 
             self.vector_db.add_summary(
                 summary=doc,
