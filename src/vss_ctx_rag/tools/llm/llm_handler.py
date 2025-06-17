@@ -23,11 +23,9 @@ from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
 from vss_ctx_rag.utils.utils import (
     is_openai_model,
-    is_gemini_model,
     is_claude_model,
 )
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_anthropic import ChatAnthropic
+from langchain_aws.chat_models import ChatBedrock
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
 
@@ -138,49 +136,11 @@ class ChatOpenAITool(LLMTool):
         self.llm = self.llm.with_config(configurable=configurable_dict)
 
 
-class ChatGeminiTool(LLMTool):
-    def __init__(self, model=None, api_key=None, **llm_params) -> None:
-        super().__init__(
-            llm=ChatGoogleGenerativeAI(
-                model=model, google_api_key=api_key, **llm_params
-            ).configurable_fields(
-                top_p=ConfigurableField(id="top_p"),
-                temperature=ConfigurableField(id="temperature"),
-                max_tokens=ConfigurableField(id="max_tokens"),
-            )
-        )
-        try:
-            if os.getenv("CA_RAG_ENABLE_WARMUP", "false").lower() == "true":
-                self.warmup(model)
-        except Exception as e:
-            logger.error(f"Error warming up LLM: {e}")
-            raise
-
-    def warmup(self, model_name):
-        try:
-            logger.info(f"Warming up LLM {model_name}")
-            logger.info(str(self.invoke("Hello, world!")))
-        except Exception as e:
-            logger.error(f"Error warming up LLM {model_name}: {e}")
-            raise
-
-    def update(self, top_p=None, temperature=None, max_tokens=None):
-        configurable_dict = {}
-        if top_p is not None:
-            configurable_dict["top_p"] = top_p
-        if temperature is not None:
-            configurable_dict["temperature"] = temperature
-        if max_tokens is not None:
-            configurable_dict["max_tokens"] = max_tokens
-        logger.debug(f"Updating LLM with config:{configurable_dict}")
-        self.llm = self.llm.with_config(configurable=configurable_dict)
-
-
 class ChatClaudeTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
         super().__init__(
-            llm=ChatAnthropic(
-                model=model, api_key=api_key, **llm_params
+            llm=ChatBedrock(
+                model_id=model, **llm_params
             ).configurable_fields(
                 top_p=ConfigurableField(id="top_p"),
                 temperature=ConfigurableField(id="temperature"),

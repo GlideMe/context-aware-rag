@@ -36,7 +36,6 @@ from vss_ctx_rag.functions.summarization import (
 from vss_ctx_rag.tools.llm import (
     LLMTool,
     ChatOpenAITool,
-    ChatGeminiTool,
     ChatClaudeTool,
 )
 from vss_ctx_rag.tools.notification import AlertSSETool
@@ -62,7 +61,6 @@ from vss_ctx_rag.functions.rag.vector_rag.vector_retrieval_func import (
 from vss_ctx_rag.utils.utils import (
     RequestInfo,
     is_openai_model,
-    is_gemini_model,
     is_claude_model,
 )
 
@@ -117,9 +115,6 @@ class ContextManagerHandler:
         if is_openai_model(model_name):
             api_key = os.getenv("OPENAI_API_KEY")
             return ChatOpenAITool(api_key=api_key, **llm_params)
-        if is_gemini_model(model_name):
-            api_key = os.getenv("GEMINI_API_KEY")
-            return ChatGeminiTool(api_key=api_key, **llm_params)
         if is_claude_model(model_name):
             api_key = os.getenv("CLAUDE_API_KEY")
             return ChatClaudeTool(api_key=api_key, **llm_params)
