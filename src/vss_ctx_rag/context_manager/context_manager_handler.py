@@ -348,6 +348,9 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_history"] = chat_config["params"].get(
                         "chat_history", DEFAULT_CHAT_HISTORY
                     )
+                    if req_info:
+                        chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
+
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)
