@@ -59,6 +59,13 @@ class GraphExtractionFunc(Function):
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
+        #TODO: Eran - Feature flag controlling graph extraction behavior
+        self.endless_ai_enabled = self.get_param(
+            "endless_ai_enabled", required=False
+        )
+
+        logger.info(f"ELAD!!! {self.endless_ai_enabled}")
+
         self.batcher = Batcher(self.batch_size)
         uuid = (
             self.get_param("params", "uuid", required=False)
