@@ -64,7 +64,7 @@ class GraphExtractionFunc(Function):
             "endless_ai_enabled", required=False
         )
 
-        logger.info(f"ELAD!!! {self.endless_ai_enabled}")
+        logger.info(f"Graph endless_ai_enabled value: {self.endless_ai_enabled}")
 
         self.batcher = Batcher(self.batch_size)
         uuid = (
