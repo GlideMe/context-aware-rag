@@ -104,8 +104,6 @@ class BatchSummarization(Function):
             "endless_ai_enabled", required=False
         )
 
-        logger.info(f"Elad: value is: {self.endless_ai_enabled}")
-
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
         self.summary_start_time = None
         self.enable_summary = True
@@ -313,7 +311,7 @@ class BatchSummarization(Function):
             logger.info("Adding doc %d", doc_i)
             doc_meta.setdefault("is_first", False)
             doc_meta.setdefault("is_last", False)
-            doc_meta.setdefault("endless_ai_enabled", False) #TODO: not sure we need the value here, this is just for handling an error we get before the value is missing
+            doc_meta.setdefault("endless_ai_enabled", False) #TODO: Eran - not sure we need the value here, this is just for handling an error we get before the value is missing
 
             self.vector_db.add_summary(
                 summary=doc,
