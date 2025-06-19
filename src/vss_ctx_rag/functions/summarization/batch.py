@@ -31,15 +31,16 @@ from vss_ctx_rag.utils.ctx_rag_batcher import Batcher
 from vss_ctx_rag.utils.globals import DEFAULT_SUMM_RECURSION_LIMIT, LLM_TOOL_NAME
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables.base import RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableLambda, RunnableSequence
+import base64
 
 class BatchSummarization(Function):
     """Batch Summarization Function"""
 
     config: dict
-    batch_prompt: str
     aggregation_prompt: str
     output_parser = StrOutputParser()
     batch_size: int
@@ -56,13 +57,19 @@ class BatchSummarization(Function):
     metrics = SummaryMetrics()
 
     def setup(self):
-        # fixed params
-        self.batch_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", self.get_param("prompts", "caption_summarization")),
-                ("user", "{input}"),
-            ]
-        )
+        def prepare_messages(inputs):
+            # start with the user text
+            content_blocks = [{"type": "text", "text": inputs["input"]}]
+
+            # Add image blocks if any are present
+            images = inputs.get("images", [])
+            if images:
+                content_blocks += [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
+                ]
+
+            return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
+
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.get_param("prompts", "summary_aggregation")),
@@ -71,7 +78,7 @@ class BatchSummarization(Function):
         )
         self.output_parser = StrOutputParser()
         self.batch_pipeline = (
-            self.batch_prompt
+            RunnableLambda(prepare_messages)
             | self.get_tool(LLM_TOOL_NAME)
             | self.output_parser
             | remove_think_tags
@@ -168,9 +175,11 @@ class BatchSummarization(Function):
                         async def aggregate_token_safe(batch, retries_left):
                             try:
                                 with TimeMeasure("OffBatSumm/AggPipeline", "blue"):
+                                    logger.info(f"aggregation_pipeline batch = {batch}")
                                     results = await self.aggregation_pipeline.ainvoke(
                                         batch
                                     )
+                                    logger.info(f"aggregation_pipeline results = {results}")
                                     return results
                             except Exception as e:
                                 if "400" not in str(e):
@@ -217,6 +226,8 @@ class BatchSummarization(Function):
                                         combined_summary = "\n".join(summaries)
 
                                         try:
+                                            logger.info(f"aggregation_pipeline combined_summary = {combined_summary}")
+
                                             aggregated = (
                                                 await self.aggregation_pipeline.ainvoke(
                                                     [combined_summary]
@@ -339,6 +350,12 @@ class BatchSummarization(Function):
                                 "No timestamp will be added."
                             )
                 doc_meta["batch_i"] = doc_i // self.batch_size
+
+
+                logger.info("ERANERAN Add doc= %s doc_meta=%s", doc, doc_meta);
+                doc = ""; # Eran: REMOVE? Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
+
+
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)
                 if batch.is_full():
                     with TimeMeasure(
@@ -353,8 +370,28 @@ class BatchSummarization(Function):
                         )
                         try:
                             with get_openai_callback() as cb:
+                                def image_file_to_base64(filepath):
+                                    # Open the image file in binary mode
+                                    with open(filepath, 'rb') as image_file:
+                                        image_data = image_file.read()
+
+                                    # Encode the binary data to base64
+                                    base64_data = base64.b64encode(image_data)
+
+                                    # Convert bytes to a string (optional)
+                                    return base64_data.decode('utf-8')
+
+                                # Fetch image data
+                                #image_url_1 = "https://glide-static-content-02.s3.us-east-1.amazonaws.com/basketball_test/grid_output_5.0-fps_1.jpg"
+                                #image_url_2 = "https://glide-static-content-02.s3.us-east-1.amazonaws.com/basketball_test/grid_output_5.0-fps_2.jpg"
+                                unique_images = set()
+                                for doc, doc_i, doc_meta in batch.as_list():
+                                    if doc_meta.get("eraneran"):
+                                        unique_images.update(doc_meta["eraneran"].split('|'))
+                                images = [image_file_to_base64(img) for img in list(unique_images)]
+
                                 batch_summary = await self.batch_pipeline.ainvoke(
-                                    " ".join([doc for doc, _, _ in batch.as_list()])
+                                    {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}
                                 )
                         except Exception as e:
                             logger.error(

@@ -19,9 +19,10 @@ import threading
 from functools import partial
 
 from langchain_community.vectorstores.neo4j_vector import Neo4jVector
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableBranch
+from langchain_core.runnables import RunnableBranch, RunnableLambda
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain.retrievers import ContextualCompressionRetriever
 
@@ -72,15 +73,34 @@ class GraphRetrieval:
             ]
         )
         self.chat_history_summarization_chain = summarization_prompt | llm
-        question_answering_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", CHAT_SYSTEM_TEMPLATE),
-                MessagesPlaceholder(variable_name="messages"),
-                ("human", "User question: {input}"),
-            ]
-        )
+        #question_answering_prompt = ChatPromptTemplate.from_messages(
+        #    [
+        #        ("system", CHAT_SYSTEM_TEMPLATE),
+        #        MessagesPlaceholder(variable_name="messages"),
+        #        ("human", "User question: {input}"),
+        #    ]
+        #)
 
-        self.question_answering_chain = question_answering_prompt | self.chat_llm
+        def prepare_messages(inputs):
+            messages = [SystemMessage(content=CHAT_SYSTEM_TEMPLATE)]
+
+            for msg in inputs["messages"]:
+                messages.append(msg)
+
+            content_blocks = [{"type": "text", "text": f"User question: {inputs['input']}"}]
+            # Add image blocks if any are present
+            images = inputs.get("images", [])
+            if images:
+                content_blocks += [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
+                ]
+            messages.append(HumanMessage(content=content_blocks))
+
+            return messages
+
+        #self.question_answering_chain = question_answering_prompt | self.chat_llm
+        self.question_answering_chain = RunnableLambda(prepare_messages) | self.chat_llm
+
         neo_4j_retriever = self.get_neo4j_retriever()
         self.doc_retriever = self.create_document_retriever_chain(neo_4j_retriever)
 
@@ -338,12 +358,13 @@ class GraphRetrieval:
         )
         summarization_thread.start()
 
-    def get_response(self, question, formatted_docs):
+    def get_response(self, question, formatted_docs, images):
         return self.question_answering_chain.invoke(
             {
                 "messages": self.chat_history.messages[:-1],
                 "context": formatted_docs,
                 "input": question,
+                "images": images,
             }
         )
 

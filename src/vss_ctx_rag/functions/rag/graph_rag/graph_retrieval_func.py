@@ -34,6 +34,8 @@ from vss_ctx_rag.utils.globals import (
 from langchain_core.messages import HumanMessage, AIMessage
 from vss_ctx_rag.utils.utils import remove_think_tags
 
+from langchain_core.runnables import RunnableLambda, RunnableSequence
+import base64
 
 class GraphRetrievalFunc(Function):
     """GraphRetrievalFunc Function"""
@@ -95,11 +97,45 @@ class GraphRetrievalFunc(Function):
             docs = self.graph_retrieval.retrieve_documents()
 
             if docs:
+                #logger.info(f"docs={repr(docs)}")
+                prompt_token_cutoff = 28
+                sorted_documents = sorted(
+                    docs,
+                    key=lambda doc: doc.state.get("query_similarity_score", 0),
+                    reverse=True,
+                )
+                documents = sorted_documents[:prompt_token_cutoff]
+                unique_images = set()
+                for doc in documents:
+                    for chunkdetail in doc.metadata["chunkdetails"]:
+                        if chunkdetail['eraneran']:
+                            unique_images.update(chunkdetail['eraneran'].split('|'))
+
+                logger.info(f"unique_images={list(unique_images)}")
+                def image_file_to_base64(filepath):
+                    # Open the image file in binary mode
+                    with open(filepath, 'rb') as image_file:
+                        image_data = image_file.read()
+
+                    # Encode the binary data to base64
+                    base64_data = base64.b64encode(image_data)
+
+                    # Convert bytes to a string (optional)
+                    return base64_data.decode('utf-8')
+                images = [image_file_to_base64(img) for img in list(unique_images)]
+
+
                 formatted_docs = self.graph_retrieval.process_documents(docs)
+
+                logger.info(f"formatted_docs={repr(formatted_docs)}")
+
                 ai_response = self.graph_retrieval.get_response(
-                    question, formatted_docs
+                    question, formatted_docs, images
                 )
                 answer = remove_think_tags(ai_response.content)
+
+                logger.info(f"question={question}, answer={answer}")
+
                 if self.chat_history:
                     with TimeMeasure("GraphRetrieval/AIMsg", "red"):
                         ai_message = AIMessage(content=answer)

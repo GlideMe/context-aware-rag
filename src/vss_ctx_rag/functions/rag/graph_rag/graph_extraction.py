@@ -213,6 +213,9 @@ class GraphExtraction:
                     "chunkIdx": chunk_document.metadata["chunkIdx"],
                 }
 
+                if ("eraneran" in chunk.source.metadata):
+                    chunk_data["eraneran"] = chunk.source.metadata["eraneran"]
+
                 if (
                     "start_ntp_float" in chunk.source.metadata
                     and "end_ntp_float" in chunk.source.metadata
@@ -248,7 +251,8 @@ class GraphExtraction:
                 WITH data, c
                 SET c.start_time = CASE WHEN data.start_time IS NOT NULL THEN data.start_time END,
                     c.end_time = CASE WHEN data.end_time IS NOT NULL THEN data.end_time END,
-                    c.chunkIdx = data.chunkIdx
+                    c.chunkIdx = data.chunkIdx,
+                    c.eraneran = data.eraneran
                 WITH data, c
                 MATCH (d:Document {uuid: data.uuid})
                 MERGE (c)-[:PART_OF]->(d)
