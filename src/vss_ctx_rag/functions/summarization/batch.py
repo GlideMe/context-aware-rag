@@ -99,9 +99,7 @@ class BatchSummarization(Function):
             else DEFAULT_SUMM_RECURSION_LIMIT
         )
 
-        self.endless_ai_enabled = self.get_param(
-            "endless_ai_enabled", required=False
-        )
+        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
         logger.info(f"Batch endless_ai_enabled value: {self.endless_ai_enabled}")
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)

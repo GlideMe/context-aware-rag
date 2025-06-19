@@ -59,10 +59,7 @@ class GraphExtractionFunc(Function):
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
-        self.endless_ai_enabled = self.get_param(
-            "endless_ai_enabled", required=False
-        )
-
+        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
         logger.info(f"Graph endless_ai_enabled value: {self.endless_ai_enabled}")
 
         self.batcher = Batcher(self.batch_size)

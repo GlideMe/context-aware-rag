@@ -245,8 +245,6 @@ class ContextManagerHandler:
                 summ_config["prompts"]["summary_aggregation"] = (
                     summary_aggregation_prompt
                 )
-                logger.info(f"ELAD1: {summ_config}")
-                # summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             except Exception as e:
                 raise ValueError("Prompt(s) missing!") from e
@@ -268,6 +266,7 @@ class ContextManagerHandler:
                             "batch_size": DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE,
                         },
                     )
+                    summ_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
                     summ_config["params"]["batch_size"] = summ_config["params"].get(
                         "batch_size", DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE
                     )
@@ -348,9 +347,7 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_history"] = chat_config["params"].get(
                         "chat_history", DEFAULT_CHAT_HISTORY
                     )
-                    logger.info(f"ELAD2: {chat_config}")
-                    # if req_info:
-                    #     chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
+                    chat_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
 
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
