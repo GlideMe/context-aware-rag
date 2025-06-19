@@ -259,7 +259,7 @@ class ContextManagerHandler:
             """
 
             summ_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
-            
+
             if enable_summarization and self.get_function("summarization") is None:
                 if summ_config["method"] == "batch":
                     summ_config["params"] = summ_config.get(
@@ -301,6 +301,8 @@ class ContextManagerHandler:
                 self.remove_function("summarization")
                 logger.info("Summarization disabled with the API call")
             chat_config = copy.deepcopy(config.get("chat"))
+
+            chat_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if (
                 req_info
@@ -349,8 +351,7 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_history"] = chat_config["params"].get(
                         "chat_history", DEFAULT_CHAT_HISTORY
                     )
-                    chat_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
-
+                    
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)
