@@ -258,7 +258,7 @@ class ContextManagerHandler:
                 enable_summarization = req_info.summarize
             """
             logger.info(f"ELAD10: {req_info.endless_ai_enabled}")
-            summ_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
+            summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if enable_summarization and self.get_function("summarization") is None:
                 if summ_config["method"] == "batch":
@@ -303,7 +303,7 @@ class ContextManagerHandler:
             chat_config = copy.deepcopy(config.get("chat"))
 
             logger.info(f"ELAD12: {req_info.endless_ai_enabled}")
-            chat_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
+            chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if (
                 req_info
