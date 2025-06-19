@@ -258,6 +258,8 @@ class ContextManagerHandler:
                 enable_summarization = req_info.summarize
             """
 
+            summ_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
+            
             if enable_summarization and self.get_function("summarization") is None:
                 if summ_config["method"] == "batch":
                     summ_config["params"] = summ_config.get(
@@ -266,7 +268,7 @@ class ContextManagerHandler:
                             "batch_size": DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE,
                         },
                     )
-                    summ_config["params"]["endless_ai_enabled"] = req_info.endless_ai_enabled
+                    
                     summ_config["params"]["batch_size"] = summ_config["params"].get(
                         "batch_size", DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE
                     )
