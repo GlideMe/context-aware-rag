@@ -309,7 +309,6 @@ class BatchSummarization(Function):
             logger.info("Adding doc %d", doc_i)
             doc_meta.setdefault("is_first", False)
             doc_meta.setdefault("is_last", False)
-            doc_meta.setdefault("endless_ai_enabled", False) #TODO: Eran - not sure we need the value here, this is just for handling an error we get before the value is missing
 
             self.vector_db.add_summary(
                 summary=doc,
