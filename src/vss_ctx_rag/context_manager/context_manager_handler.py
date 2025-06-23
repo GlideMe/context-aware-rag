@@ -221,12 +221,14 @@ class ContextManagerHandler:
 
     def configure_update(self, config: Dict, req_info):
         try:
+
+            summ_config = copy.deepcopy(config.get("summarization"))
             caption_summarization_prompt = ""
             summary_aggregation_prompt = ""
             if req_info:
                 caption_summarization_prompt = req_info.caption_summarization_prompt
                 summary_aggregation_prompt = req_info.summary_aggregation_prompt
-            summ_config = copy.deepcopy(config.get("summarization"))
+                summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             try:
                 self.default_caption_prompt = summ_config["prompts"]["caption"]
@@ -257,7 +259,6 @@ class ContextManagerHandler:
             else:
                 enable_summarization = req_info.summarize
             """
-            summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if enable_summarization and self.get_function("summarization") is None:
                 if summ_config["method"] == "batch":
@@ -301,7 +302,8 @@ class ContextManagerHandler:
                 logger.info("Summarization disabled with the API call")
             chat_config = copy.deepcopy(config.get("chat"))
 
-            chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
+            if req_info:
+                chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if (
                 req_info
