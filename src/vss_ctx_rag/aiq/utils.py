@@ -160,6 +160,3 @@ def update_request_info(config, req_info):
     for field in vars(req_info).keys():
         if hasattr(config, field):
             setattr(req_info, field, getattr(config, field))
-
-    if hasattr(config, "endless_ai_enabled"):
-        req_info.endless_ai_enabled = getattr(config, "endless_ai_enabled")
