@@ -15,11 +15,16 @@
 
 import os
 import time
-from typing import Optional
+import json
+import boto3
+from typing import Optional, Iterator, Dict, Any, List
+from botocore.exceptions import BotoCoreError, ClientError
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
@@ -27,7 +32,6 @@ from vss_ctx_rag.utils.utils import (
     is_openai_model,
     is_claude_model,
 )
-from langchain_aws.chat_models import ChatBedrock
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
 
@@ -138,47 +142,131 @@ class ChatOpenAITool(LLMTool):
         self.llm = self.llm.with_config(configurable=configurable_dict)
 
 
+class ClaudeBedrockLLM(BaseChatModel):
+    """Direct boto3 implementation for Claude on AWS Bedrock"""
+    
+    def __init__(self, model_id: str, region_name: str = "us-east-1", **kwargs):
+        super().__init__(**kwargs)
+        self.model_id = model_id
+        self.region_name = region_name
+        
+        # Model parameters with defaults
+        self.max_tokens = 4096
+        self.temperature = 0.1
+        self.top_p = 0.9
+        
+        # Initialize boto3 client
+        try:
+            self.bedrock_client = boto3.client(
+                service_name='bedrock-runtime',
+                region_name=region_name
+            )
+            logger.info(f"Initialized Bedrock client for region: {region_name}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Bedrock client: {e}")
+            raise
+    
+    def _format_messages_for_claude(self, messages: List[BaseMessage]) -> Dict[str, Any]:
+        """Convert LangChain messages to Claude Bedrock format"""
+        formatted_messages = []
+        
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                formatted_messages.append({
+                    "role": "user",
+                    "content": msg.content
+                })
+            elif isinstance(msg, AIMessage):
+                formatted_messages.append({
+                    "role": "assistant", 
+                    "content": msg.content
+                })
+        
+        return {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "messages": formatted_messages
+        }
+    
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> ChatResult:
+        """Generate a single response using Bedrock"""
+        try:
+            # Format messages for Claude
+            body = self._format_messages_for_claude(messages)
+            
+            # Call Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(body),
+                contentType='application/json'
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body.get('content', [{}])[0].get('text', '')
+            
+            # Create ChatGeneration
+            generation = ChatGeneration(message=AIMessage(content=content))
+            
+            return ChatResult(generations=[generation])
+            
+        except (BotoCoreError, ClientError) as e:
+            logger.error(f"AWS Bedrock error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error calling Claude: {e}")
+            raise
+    
+    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
+        """Stream response from Bedrock (simplified - yields single response)"""
+        # For now, just return the full response
+        # Full streaming would require invoke_model_with_response_stream
+        result = self._generate(messages, stop, **kwargs)
+        yield result.generations[0]
+    
+    @property
+    def _llm_type(self) -> str:
+        return "claude-bedrock-boto3"
+
+
 class ChatClaudeTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
         # Validate AWS credentials for Bedrock access
         self._validate_aws_credentials()
         
         # Set optimal defaults for Claude Sonnet performance and cost balance
-        bedrock_params = {
-            "region_name": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
-            "model_kwargs": {
-                "max_tokens": llm_params.get("max_tokens", 4096),
-                "temperature": llm_params.get("temperature", 0.1),  # Lower for consistency
-                "top_p": llm_params.get("top_p", 0.9),
-                "anthropic_version": "bedrock-2023-05-31"
-            },
-            "streaming": llm_params.get("streaming", False),
-            "verbose": llm_params.get("verbose", False)
-        }
+        region_name = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+        model_id = model or "anthropic.claude-3-5-sonnet-20241022-v2:0"
         
-        # Remove processed params to avoid conflicts
-        for param in ["max_tokens", "temperature", "top_p", "streaming", "verbose"]:
-            llm_params.pop(param, None)
-            
-        bedrock_params.update(llm_params)
+        # Extract parameters for our custom LLM
+        max_tokens = llm_params.get("max_tokens", 4096)
+        temperature = llm_params.get("temperature", 0.1)
+        top_p = llm_params.get("top_p", 0.9)
         
-        logger.info(f"Initializing Claude Bedrock client for model: {model}")
+        logger.info(f"Initializing Claude Bedrock client for model: {model_id}")
+        
+        # Create our custom boto3-based LLM
+        claude_llm = ClaudeBedrockLLM(
+            model_id=model_id,
+            region_name=region_name
+        )
+        
+        # Set initial parameters
+        claude_llm.max_tokens = max_tokens
+        claude_llm.temperature = temperature
+        claude_llm.top_p = top_p
         
         super().__init__(
-            llm=ChatBedrock(
-                model_id=model or "us.anthropic.claude-sonnet-4-20250514-v1:0",
-                **bedrock_params
-            ).configurable_fields(
-                top_p=ConfigurableField(id="top_p"),
-                temperature=ConfigurableField(id="temperature"),
-                max_tokens=ConfigurableField(id="max_tokens"),
-            )
+            llm=claude_llm,
+            name="claude_bedrock_tool"
         )
         
         # Enhanced warmup with retry logic
         try:
             if os.getenv("CA_RAG_ENABLE_WARMUP", "false").lower() == "true":
-                self.warmup(model or "us.anthropic.claude-sonnet-4-20250514-v1:0")
+                self.warmup(model_id)
         except Exception as e:
             logger.error(f"Error warming up Claude LLM: {e}")
             # Don't raise - allow initialization to continue for graceful degradation
@@ -218,24 +306,19 @@ class ChatClaudeTool(LLMTool):
 
     def update(self, top_p=None, temperature=None, max_tokens=None):
         """Update Claude model configuration with validation and optimization."""
-        configurable_dict = {}
         
         # Validate and optimize parameters for Claude Sonnet
         if top_p is not None:
             top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
-            configurable_dict["top_p"] = top_p
+            self.llm.top_p = top_p
             
         if temperature is not None:
             temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
-            configurable_dict["temperature"] = temperature
+            self.llm.temperature = temperature
             
         if max_tokens is not None:
             # Optimize for Claude Sonnet's capabilities
             max_tokens = max(1, min(4096, int(max_tokens)))  # Clamp to model limits
-            configurable_dict["max_tokens"] = max_tokens
+            self.llm.max_tokens = max_tokens
         
-        if configurable_dict:
-            logger.debug(f"Updating Claude LLM configuration: {configurable_dict}")
-            self.llm = self.llm.with_config(configurable=configurable_dict)
-        else:
-            logger.debug("No valid configuration updates provided")
+        logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
