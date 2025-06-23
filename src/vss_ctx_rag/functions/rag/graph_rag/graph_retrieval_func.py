@@ -98,7 +98,7 @@ class GraphRetrievalFunc(Function):
 
             if docs:
                 #logger.info(f"docs={repr(docs)}")
-                prompt_token_cutoff = 28
+                prompt_token_cutoff = 5
                 sorted_documents = sorted(
                     docs,
                     key=lambda doc: doc.state.get("query_similarity_score", 0),

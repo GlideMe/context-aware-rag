@@ -39,6 +39,7 @@ from vss_ctx_rag.functions.rag.graph_rag.constants import (
     CHAT_SEARCH_KWARG_SCORE_THRESHOLD,
     QUESTION_TRANSFORM_TEMPLATE,
     CHAT_SYSTEM_TEMPLATE,
+    CHAT_SYSTEM_GRID_TEMPLATE,
     VECTOR_GRAPH_SEARCH_QUERY,
     VECTOR_SEARCH_TOP_K,
     CHAT_EMBEDDING_FILTER_SCORE_THRESHOLD,
@@ -82,7 +83,7 @@ class GraphRetrieval:
         #)
 
         def prepare_messages(inputs):
-            messages = [SystemMessage(content=CHAT_SYSTEM_TEMPLATE)]
+            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE)]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
