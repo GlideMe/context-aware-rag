@@ -110,9 +110,6 @@ class GraphExtractionFunc(Function):
                         + doc
                     )
             batch = self.batcher.add_doc(doc, doc_i=doc_i, doc_meta=doc_meta)
-            #logger.info(f"aprocess_doc() doc_i = {doc_i}, doc_meta = {doc_meta}, doc = {doc}")
-            #logger.info(f"aprocess_doc() batch.is_full() = {batch.is_full()}")
-
             if batch.is_full():
                 with TimeMeasure(
                     "GraphRAG/aprocess-doc/graph-create: "

@@ -106,7 +106,7 @@ VECTOR_GRAPH_SEARCH_QUERY_SUFFIX = """
 // Generate metadata and text components for chunks, nodes, and relationships
 WITH d, avg_score,
      [c IN chunks | c.chunk.text] AS texts,
-     [c IN chunks | {id: c.chunk.id, score: c.score, chunkIdx: c.chunk.chunkIdx, content: c.chunk.text, eraneran: c.chunk.eraneran}] AS chunkdetails,
+     [c IN chunks | {id: c.chunk.id, score: c.score, chunkIdx: c.chunk.chunkIdx, content: c.chunk.text, grid_filenames: c.chunk.grid_filenames}] AS chunkdetails,
      [n IN nodes | elementId(n)] AS entityIds,
      [r IN rels | elementId(r)] AS relIds,
      apoc.coll.sort([

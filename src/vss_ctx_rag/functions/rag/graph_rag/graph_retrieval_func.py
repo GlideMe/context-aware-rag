@@ -108,10 +108,11 @@ class GraphRetrievalFunc(Function):
                 unique_images = set()
                 for doc in documents:
                     for chunkdetail in doc.metadata["chunkdetails"]:
-                        if chunkdetail['eraneran']:
-                            unique_images.update(chunkdetail['eraneran'].split('|'))
+                        if chunkdetail['grid_filenames']:
+                            unique_images.update(chunkdetail['grid_filenames'].split('|'))
 
                 logger.info(f"unique_images={list(unique_images)}")
+
                 def image_file_to_base64(filepath):
                     # Open the image file in binary mode
                     with open(filepath, 'rb') as image_file:
@@ -120,21 +121,19 @@ class GraphRetrievalFunc(Function):
                     # Encode the binary data to base64
                     base64_data = base64.b64encode(image_data)
 
-                    # Convert bytes to a string (optional)
+                    # Convert bytes to a string
                     return base64_data.decode('utf-8')
                 images = [image_file_to_base64(img) for img in list(unique_images)]
 
 
                 formatted_docs = self.graph_retrieval.process_documents(docs)
-
-                logger.info(f"formatted_docs={repr(formatted_docs)}")
+                #logger.info(f"formatted_docs={repr(formatted_docs)}")
 
                 ai_response = self.graph_retrieval.get_response(
                     question, formatted_docs, images
                 )
                 answer = remove_think_tags(ai_response.content)
-
-                logger.info(f"question={question}, answer={answer}")
+                #logger.info(f"question={question}, answer={answer}")
 
                 if self.chat_history:
                     with TimeMeasure("GraphRetrieval/AIMsg", "red"):

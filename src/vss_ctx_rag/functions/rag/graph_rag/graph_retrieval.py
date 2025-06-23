@@ -19,7 +19,7 @@ import threading
 from functools import partial
 
 from langchain_community.vectorstores.neo4j_vector import Neo4jVector
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableBranch, RunnableLambda
