@@ -73,6 +73,7 @@ class RequestInfo(BaseModel):
     notification_temperature: Optional[float] = None
     notification_max_tokens: Optional[int] = None
     rag_type: str = "vector-rag"
+    endless_ai_enabled: bool = False
 
 
 class CallRequest(BaseModel):
