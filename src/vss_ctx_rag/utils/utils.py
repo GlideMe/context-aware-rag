@@ -119,6 +119,8 @@ def is_claude_model(model_name: str) -> bool:
         "claude",
         "anthropic.claude",
         "anthropic.",
+        "us.anthropic.claude",
+        "us.anthropic.",
     )
 
     return any(model.startswith(prefix) for prefix in claude_prefixes)
