@@ -28,10 +28,10 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
-#from vss_ctx_rag.utils.utils import (
-#    is_openai_model,
-#    is_claude_model,
-#)
+from vss_ctx_rag.utils.utils import (
+    is_openai_model,
+    is_claude_model,
+)
 from vss_ctx_rag.utils.utils import is_openai_model
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
