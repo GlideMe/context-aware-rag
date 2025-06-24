@@ -35,7 +35,7 @@ from vss_ctx_rag.utils.utils import (
 from vss_ctx_rag.utils.utils import is_openai_model
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
-
+from typing import Optional, Iterator, Dict, Any, List
 
 class LLMTool(Tool, Runnable):
     """A Tool class wrapper for LLMs.
@@ -152,6 +152,7 @@ class ClaudeBedrockLLM(BaseChatModel):
     max_tokens: int = 4096
     temperature: float = 0.1
     top_p: float = 0.9
+    bedrock_client: Any = None
     
     def __init__(self, model_id: str, region_name: str = "us-east-1", **kwargs):
         # Pass fields to parent class
@@ -161,6 +162,7 @@ class ClaudeBedrockLLM(BaseChatModel):
             max_tokens=4096,
             temperature=0.1,
             top_p=0.9,
+            bedrock_client=None,
             **kwargs
         )
         
