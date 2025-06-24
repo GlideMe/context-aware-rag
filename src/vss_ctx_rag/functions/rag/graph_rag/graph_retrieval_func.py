@@ -65,6 +65,8 @@ class GraphRetrievalFunc(Function):
         uuid = self.get_param("params", "uuid", required=False)
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
+        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
+
         try:
             self.graph_retrieval = GraphRetrieval(
                 llm=self.chat_llm,
@@ -72,6 +74,7 @@ class GraphRetrievalFunc(Function):
                 multi_channel=self.multi_channel,
                 uuid=uuid,
                 top_k=self.top_k,
+                endless_ai_enabled=self.endless_ai_enabled,
             )
         except Exception as e:
             logger.error(f"Error initializing GraphRetrieval: {e}")

@@ -365,7 +365,9 @@ class BatchSummarization(Function):
 
 
                 logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
-                doc = ""; # REMOVE? Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
+
+                if self.endless_ai_enabled:
+                    doc = ""; # REMOVE? Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
 
 
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)

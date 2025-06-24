@@ -55,11 +55,13 @@ class GraphRetrieval:
         multi_channel=False,
         uuid="default",
         top_k=None,
+        endless_ai_enabled=False,
     ):
         self.chat_llm = llm
         self.graph_db = graph
         self.chat_history = ChatMessageHistory()
         self.top_k = top_k
+        self.endless_ai_enabled = endless_ai_enabled
         self.uuid = uuid
         self.multi_channel = multi_channel
         summarization_prompt = ChatPromptTemplate.from_messages(
@@ -83,18 +85,20 @@ class GraphRetrieval:
         #)
 
         def prepare_messages(inputs):
-            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE)]
+            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE)]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
 
             content_blocks = [{"type": "text", "text": f"User question: {inputs['input']}"}]
             # Add image blocks if any are present
-            images = inputs.get("images", [])
-            if images:
-                content_blocks += [
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                ]
+            if self.endless_ai_enabled:
+                images = inputs.get("images", [])
+                if images:
+                    content_blocks += [
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
+                    ]
+
             messages.append(HumanMessage(content=content_blocks))
 
             return messages
