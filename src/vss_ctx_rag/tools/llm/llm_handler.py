@@ -201,7 +201,7 @@ class ClaudeBedrockLLM(BaseChatModel):
             "messages": formatted_messages
         }
     
-    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> ChatResult:
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
         """Generate a single response using Bedrock"""
         try:
             # Format messages for Claude
