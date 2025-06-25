@@ -65,7 +65,6 @@ class GraphExtraction:
             node_properties=False,
             relationship_properties=False,
             ignore_tool_usage=True,
-            llm_kwargs={"max_concurrency": 3}
         )
         self.uuid = uuid
         self.batcher = batcher

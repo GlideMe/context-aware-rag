@@ -26,8 +26,6 @@ from dataclasses import dataclass
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
-from vss_ctx_rag.utils.utils import is_claude_model
-
 
 from vss_ctx_rag.base import Function
 from vss_ctx_rag.tools.storage.neo4j_db import Neo4jGraphDB
