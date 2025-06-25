@@ -204,6 +204,14 @@ class ClaudeBedrockLLM(BaseChatModel):
     def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
         """Generate a single response using Bedrock"""
         try:
+            # ADD DEBUG LOGS HERE
+            logger.info(f"DEBUG CLAUDE INPUT: Number of messages: {len(messages)}")
+            for i, msg in enumerate(messages):
+                logger.info(f"DEBUG CLAUDE INPUT: Message {i} type: {type(msg)}")
+                logger.info(f"DEBUG CLAUDE INPUT: Message {i} content: {str(msg.content)[:500]}...")
+            # END DEBUG LOGS
+            
+
             # Format messages for Claude
             body = self._format_messages_for_claude(messages)
             
