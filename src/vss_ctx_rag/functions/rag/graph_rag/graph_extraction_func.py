@@ -134,9 +134,9 @@ class GraphExtractionFunc(Function):
                             if is_claude_model(model_name):
                                 with get_bedrock_anthropic_callback() as cb:
                                     await self.graph_extraction.acreate_graph(batch)
-                        else:
-                            with get_openai_callback() as cb:
-                                await self.graph_extraction.acreate_graph(batch)
+                            else:
+                                with get_openai_callback() as cb:
+                                    await self.graph_extraction.acreate_graph(batch)
                         
                         logger.info(
                             "GraphRAG Creation for %d docs\n"
