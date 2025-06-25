@@ -27,7 +27,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_community.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
 from vss_ctx_rag.utils.utils import is_claude_model
-from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
+
 
 from vss_ctx_rag.base import Function
 from vss_ctx_rag.tools.storage.neo4j_db import Neo4jGraphDB
@@ -130,13 +130,8 @@ class GraphExtractionFunc(Function):
                             with get_bedrock_anthropic_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
                         else:
-                            model_name = getattr(self.chat_llm.llm, 'model_id', '') or getattr(self.chat_llm.llm, 'model', '')
-                            if is_claude_model(model_name):
-                                with get_bedrock_anthropic_callback() as cb:
-                                    await self.graph_extraction.acreate_graph(batch)
-                            else:
-                                with get_openai_callback() as cb:
-                                    await self.graph_extraction.acreate_graph(batch)
+                            with get_openai_callback() as cb:
+                                await self.graph_extraction.acreate_graph(batch)
                         
                         logger.info(
                             "GraphRAG Creation for %d docs\n"
