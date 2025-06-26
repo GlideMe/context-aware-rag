@@ -17,11 +17,10 @@ summarization:
   enable: true
   method: "batch"
   llm:
-    model: meta/llama-3.1-70b-instruct
-    base_url: https://integrate.api.nvidia.com/v1
-    max_tokens: 2048
-    temperature: 0.2
-    top_p: 0.7
+    model: us.anthropic.claude-sonnet-4-20250514-v1:0
+    max_tokens: 4096
+    temperature: 0.1
+    top_p: 0.9
   embedding:
     model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
     base_url: https://integrate.api.nvidia.com/v1
@@ -38,10 +37,9 @@ chat:
   params:
     batch_size: 1
   llm:
-    model: meta/llama-3.1-70b-instruct
-    base_url: https://integrate.api.nvidia.com/v1
-    max_tokens: 2048
-    temperature: 0.5
+    model: us.anthropic.claude-sonnet-4-20250514-v1:0
+    max_tokens: 4096
+    temperature: 0.1
   embedding:
     model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
     base_url: https://integrate.api.nvidia.com/v1
@@ -53,8 +51,7 @@ notification:
   enable: true
   endpoint: "http://127.0.0.1:60000/via-alert-callback"
   llm:
-    model: meta/llama-3.1-70b-instruct
-    base_url: https://integrate.api.nvidia.com/v1
-    max_tokens: 2048
-    temperature: 0.2
-    top_p: 0.7
+    model: us.anthropic.claude-sonnet-4-20250514-v1:0
+    max_tokens: 4096
+    temperature: 0.1
+    top_p: 0.9
