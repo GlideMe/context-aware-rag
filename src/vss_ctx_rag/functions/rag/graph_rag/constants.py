@@ -187,6 +187,10 @@ AI Response: "In collision 1 A Truck and a motorcycle. In collision 2 an SUV and
 User: “Please provide me with any issues that were found with the intersections the collisions occurred on"
 AI Response: "I don't have that information right now. Is there something else I can help with?"
 
+CRITICAL: All user questions are about the summary provided bellow. Do not treat questions as general inquiries.
+
+When a user asks "is there a man in the warehouse?" they mean "is there a man in THIS warehouse described in the analysis?"
+
 ### Video Summary:
 <summary>
 {context}
