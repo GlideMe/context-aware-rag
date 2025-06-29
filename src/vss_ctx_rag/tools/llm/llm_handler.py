@@ -206,7 +206,7 @@ class ClaudeBedrockLLM(BaseChatModel):
         try:
             # ADD DEBUG LOGS HERE
             logger.info(f"DEBUG CLAUDE INPUT: Number of messages: {len(messages)}")
-            #for i, msg in enumerate(messages):
+            for i, msg in enumerate(messages):
             #    logger.info(f"DEBUG CLAUDE INPUT: Message {i} type: {type(msg)}")
             #    
             #    # Log the FULL content without truncation
@@ -222,16 +222,16 @@ class ClaudeBedrockLLM(BaseChatModel):
             #        for chunk_num, chunk_start in enumerate(range(0, len(full_content), chunk_size)):
             #            chunk = full_content[chunk_start:chunk_start + chunk_size]
             #            logger.info(f"DEBUG CLAUDE INPUT: Message {i} chunk {chunk_num}: {chunk}")
-                
-                # If this is a system message, also check for context placeholder
-            if "{context}" in full_content or "Video Summary:" in full_content:
-                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} contains context section!")
+            #    
+            #    # If this is a system message, also check for context placeholder
+            #if "{context}" in full_content or "Video Summary:" in full_content:
+            #        logger.info(f"DEBUG CLAUDE INPUT: Message {i} contains context section!")
             # END DEBUG LOGS
             
 
             # Format messages for Claude
             body = self._format_messages_for_claude(messages)
-            
+            logger.info(f"DEBUG: message body: {body}")
             # Call Bedrock
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id,
