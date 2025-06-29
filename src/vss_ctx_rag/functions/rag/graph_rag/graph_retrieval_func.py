@@ -108,26 +108,30 @@ class GraphRetrievalFunc(Function):
                     reverse=True,
                 )
                 documents = sorted_documents[:prompt_token_cutoff]
-                unique_images = set()
-                for doc in documents:
-                    for chunkdetail in doc.metadata["chunkdetails"]:
-                        if chunkdetail['grid_filenames']:
-                            unique_images.update(chunkdetail['grid_filenames'].split('|'))
 
-                logger.info(f"unique_images={list(unique_images)}")
+                if self.endless_ai_enabled:
+                    # Add grid images according to chunks
+                    unique_images = set()
+                    for doc in documents:
+                        for chunkdetail in doc.metadata["chunkdetails"]:
+                            if chunkdetail['grid_filenames']:
+                                unique_images.update(chunkdetail['grid_filenames'].split('|'))
 
-                def image_file_to_base64(filepath):
-                    # Open the image file in binary mode
-                    with open(filepath, 'rb') as image_file:
-                        image_data = image_file.read()
+                    # logger.info(f"unique_images={list(unique_images)}")
 
-                    # Encode the binary data to base64
-                    base64_data = base64.b64encode(image_data)
+                    def image_file_to_base64(filepath):
+                        # Open the image file in binary mode
+                        with open(filepath, 'rb') as image_file:
+                            image_data = image_file.read()
 
-                    # Convert bytes to a string
-                    return base64_data.decode('utf-8')
-                images = [image_file_to_base64(img) for img in list(unique_images)]
+                        # Encode the binary data to base64
+                        base64_data = base64.b64encode(image_data)
 
+                        # Convert bytes to a string
+                        return base64_data.decode('utf-8')
+                    images = [image_file_to_base64(img) for img in list(unique_images)]
+                else:
+                    images = []
 
                 formatted_docs = self.graph_retrieval.process_documents(docs)
                 #logger.info(f"formatted_docs={repr(formatted_docs)}")

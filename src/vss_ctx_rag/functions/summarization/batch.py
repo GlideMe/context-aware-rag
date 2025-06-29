@@ -384,23 +384,26 @@ class BatchSummarization(Function):
                         )
                         try:
                             with get_openai_callback() as cb:
-                                def image_file_to_base64(filepath):
-                                    # Open the image file in binary mode
-                                    with open(filepath, 'rb') as image_file:
-                                        image_data = image_file.read()
+                                if self.endless_ai_enabled:
+                                    def image_file_to_base64(filepath):
+                                        # Open the image file in binary mode
+                                        with open(filepath, 'rb') as image_file:
+                                            image_data = image_file.read()
 
-                                    # Encode the binary data to base64
-                                    base64_data = base64.b64encode(image_data)
+                                        # Encode the binary data to base64
+                                        base64_data = base64.b64encode(image_data)
 
-                                    # Convert bytes to a string (optional)
-                                    return base64_data.decode('utf-8')
+                                        # Convert bytes to a string (optional)
+                                        return base64_data.decode('utf-8')
 
-                                # Fetch image data
-                                unique_images = set()
-                                for doc, doc_i, doc_meta in batch.as_list():
-                                    if doc_meta.get("grid_filenames"):
-                                        unique_images.update(doc_meta["grid_filenames"].split('|'))
-                                images = [image_file_to_base64(img) for img in list(unique_images)]
+                                    # Fetch image data
+                                    unique_images = set()
+                                    for doc, doc_i, doc_meta in batch.as_list():
+                                        if doc_meta.get("grid_filenames"):
+                                            unique_images.update(doc_meta["grid_filenames"].split('|'))
+                                    images = [image_file_to_base64(img) for img in list(unique_images)]
+                                else:
+                                    images = []
 
                                 batch_summary = await self.batch_pipeline.ainvoke(
                                     {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}
