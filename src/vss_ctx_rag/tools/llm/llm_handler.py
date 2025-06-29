@@ -206,7 +206,7 @@ class ClaudeBedrockLLM(BaseChatModel):
         try:
             # ADD DEBUG LOGS HERE
             logger.info(f"DEBUG CLAUDE INPUT: Number of messages: {len(messages)}")
-            for i, msg in enumerate(messages):
+            #for i, msg in enumerate(messages):
             #    logger.info(f"DEBUG CLAUDE INPUT: Message {i} type: {type(msg)}")
             #    
             #    # Log the FULL content without truncation
