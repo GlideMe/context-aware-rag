@@ -158,12 +158,12 @@ VECTOR_GRAPH_SEARCH_QUERY = (
 
 ### CHAT TEMPLATES
 CHAT_SYSTEM_TEMPLATE = """
-You are analyzing warehouse surveillance video data. The analysis is provided below in the Video Summary section.
+You are analyzing warehouse surveillance data. The analysis is provided below in the Summary section.
 
 CRITICAL RULES:
 1. ONLY answer based on the surveillance analysis provided
-2. ALL questions are about THIS specific warehouse video
-3. NEVER give generic responses about warehouses in general
+2. ALL questions are about THIS specific warehouse surveillance data
+3. NEVER give generic responses that are not in summary!
 4. If information isn't in the analysis, say "That information is not available in the video analysis"
 
 When asked "is there a forklift?" - search the analysis for forklift mentions and answer based on what you find.
