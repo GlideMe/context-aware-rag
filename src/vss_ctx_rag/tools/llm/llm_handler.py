@@ -208,7 +208,24 @@ class ClaudeBedrockLLM(BaseChatModel):
             logger.info(f"DEBUG CLAUDE INPUT: Number of messages: {len(messages)}")
             for i, msg in enumerate(messages):
                 logger.info(f"DEBUG CLAUDE INPUT: Message {i} type: {type(msg)}")
-                logger.info(f"DEBUG CLAUDE INPUT: Message {i} content: {str(msg.content)[:500]}...")
+                
+                # Log the FULL content without truncation
+                full_content = str(msg.content)
+                logger.info(f"DEBUG CLAUDE INPUT: Message {i} content length: {len(full_content)}")
+                
+                # Split into chunks if too long for single log line
+                chunk_size = 2000  # Adjust if needed
+                if len(full_content) <= chunk_size:
+                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} content: {full_content}")
+                else:
+                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} content (chunked):")
+                    for chunk_num, chunk_start in enumerate(range(0, len(full_content), chunk_size)):
+                        chunk = full_content[chunk_start:chunk_start + chunk_size]
+                        logger.info(f"DEBUG CLAUDE INPUT: Message {i} chunk {chunk_num}: {chunk}")
+                
+                # If this is a system message, also check for context placeholder
+                if "{context}" in full_content or "Video Summary:" in full_content:
+                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} contains context section!")
             # END DEBUG LOGS
             
 
