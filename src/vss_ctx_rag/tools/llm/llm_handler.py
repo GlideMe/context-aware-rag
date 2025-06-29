@@ -224,7 +224,11 @@ class ClaudeBedrockLLM(BaseChatModel):
             
             # Parse response
             response_body = json.loads(response['body'].read())
-            content = response_body.get('content', [{}])[0].get('text', '')
+            content_list = response_body.get('content', [])
+            if content_list:  # Check if list has elements
+                content = content_list[0].get('text', '')
+            else:
+                content = ''  # Handle empty list safely
             
             # Create ChatGeneration
             generation = ChatGeneration(message=AIMessage(content=content))
