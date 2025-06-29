@@ -76,13 +76,6 @@ class GraphRetrieval:
             ]
         )
         self.chat_history_summarization_chain = summarization_prompt | llm
-        #question_answering_prompt = ChatPromptTemplate.from_messages(
-        #    [
-        #        ("system", CHAT_SYSTEM_TEMPLATE),
-        #        MessagesPlaceholder(variable_name="messages"),
-        #        ("human", "User question: {input}"),
-        #    ]
-        #)
 
         def prepare_messages(inputs):
             messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE)]
@@ -103,7 +96,6 @@ class GraphRetrieval:
 
             return messages
 
-        #self.question_answering_chain = question_answering_prompt | self.chat_llm
         self.question_answering_chain = RunnableLambda(prepare_messages) | self.chat_llm
 
         neo_4j_retriever = self.get_neo4j_retriever()

@@ -21,6 +21,7 @@ from pathlib import Path
 import time
 from langchain_community.callbacks import get_openai_callback
 from schema import Schema
+import base64
 
 from vss_ctx_rag.base import Function
 from vss_ctx_rag.utils.utils import remove_think_tags
@@ -29,19 +30,17 @@ from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
 from vss_ctx_rag.utils.ctx_rag_batcher import Batcher
 from vss_ctx_rag.utils.globals import DEFAULT_SUMM_RECURSION_LIMIT, LLM_TOOL_NAME
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.runnables import RunnableLambda, RunnableSequence
-import base64
 
 class BatchSummarization(Function):
     """Batch Summarization Function"""
 
     config: dict
-    #batch_prompt: str
     aggregation_prompt: str
     output_parser = StrOutputParser()
     batch_size: int
@@ -58,13 +57,6 @@ class BatchSummarization(Function):
     metrics = SummaryMetrics()
 
     def setup(self):
-        # fixed params
-        #self.batch_prompt = ChatPromptTemplate.from_messages(
-        #    [
-        #        ("system", self.get_param("prompts", "caption_summarization")),
-        #        ("user", "{input}"),
-        #    ]
-        #)
         def prepare_messages(inputs):
             # start with the user text
             content_blocks = [{"type": "text", "text": inputs["input"]}]
@@ -86,7 +78,6 @@ class BatchSummarization(Function):
         )
         self.output_parser = StrOutputParser()
         self.batch_pipeline = (
-            #self.batch_prompt
             RunnableLambda(prepare_messages)
             | self.get_tool(LLM_TOOL_NAME)
             | self.output_parser
@@ -364,7 +355,7 @@ class BatchSummarization(Function):
                 doc_meta["batch_i"] = doc_i // self.batch_size
 
 
-                logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
+                # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
                 if self.endless_ai_enabled:
                     doc = ""; # REMOVE? Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")

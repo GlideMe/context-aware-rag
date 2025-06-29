@@ -100,17 +100,17 @@ class GraphRetrievalFunc(Function):
             docs = self.graph_retrieval.retrieve_documents()
 
             if docs:
-                #logger.info(f"docs={repr(docs)}")
-                prompt_token_cutoff = 5
-                sorted_documents = sorted(
-                    docs,
-                    key=lambda doc: doc.state.get("query_similarity_score", 0),
-                    reverse=True,
-                )
-                documents = sorted_documents[:prompt_token_cutoff]
-
                 if self.endless_ai_enabled:
                     # Add grid images according to chunks
+                    #logger.info(f"docs={repr(docs)}")
+                    prompt_token_cutoff = 5
+                    sorted_documents = sorted(
+                        docs,
+                        key=lambda doc: doc.state.get("query_similarity_score", 0),
+                        reverse=True,
+                    )
+                    documents = sorted_documents[:prompt_token_cutoff]
+
                     unique_images = set()
                     for doc in documents:
                         for chunkdetail in doc.metadata["chunkdetails"]:
@@ -134,8 +134,6 @@ class GraphRetrievalFunc(Function):
                     images = []
 
                 formatted_docs = self.graph_retrieval.process_documents(docs)
-                #logger.info(f"formatted_docs={repr(formatted_docs)}")
-
                 ai_response = self.graph_retrieval.get_response(
                     question, formatted_docs, images
                 )
