@@ -231,7 +231,7 @@ class ClaudeBedrockLLM(BaseChatModel):
 
             # Format messages for Claude
             body = self._format_messages_for_claude(messages)
-            logger.info(f"DEBUG: message body: {body}")
+            logger.info(f"DEBUG: message body: {json.dumps(body)}")
             # Call Bedrock
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id,
