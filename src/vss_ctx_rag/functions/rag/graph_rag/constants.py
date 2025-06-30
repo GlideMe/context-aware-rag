@@ -189,23 +189,6 @@ AI Response: "In collision 1 A Truck and a motorcycle. In collision 2 an SUV and
 User: “Please provide me with any issues that were found with the intersections the collisions occurred on"
 AI Response: "I don't have that information right now. Is there something else I can help with?"
 
-###Example data:
-{
-  "anthropic_version": "bedrock-2023-05-31",
-  "max_tokens": 4096,
-  "temperature": 0.1,
-  "top_p": 0.9,
-  "messages": [
-    {
-      "role": "system",
-      "content": "You have warehouse surveillance information. Look at this example:\n\nEXAMPLE WAREHOUSE DATA:\n'<2.00-4.00>: Worker in plaid shirt operating red forklift enters from left side'\n'Safety Equipment:orange traffic cone LOCATED_IN Location:aisle between C and D'\n'<3.00-4.00>: Worker drops cardboard box in center aisle - ANOMALY'\n\nEXAMPLE QUESTION: 'orange cones in warehouse?'\nCORRECT ANSWER: 'Yes, there are orange traffic cones located in the aisle between C and D.'\n\nEXAMPLE QUESTION: 'is there a dropped box?'\nCORRECT ANSWER: 'Yes, a worker dropped a cardboard box in the center aisle between 3.00-4.00.'\n\nYOUR WAREHOUSE DATA:\n{context}\n\nAnswer questions by finding information in the warehouse data above."
-    },
-    {
-      "role": "user", 
-      "content": "orange cones in warehouse?"
-    }
-  ]
-}
 ### Video Summary:
 <summary>
 {context}
