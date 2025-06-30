@@ -339,6 +339,17 @@ class GraphRetrieval:
         summarization_thread.start()
 
     def get_response(self, question, formatted_docs):
+        # LOG THE CONTEXT DATA BEING SENT TO LLM
+        logger.info(f"=== DEBUG CONTEXT DATA ===")
+        logger.info(f"Context length: {len(formatted_docs)} characters")
+        logger.info(f"Context preview (first 500 chars): {formatted_docs[:500]}...")
+        logger.info(f"Context preview (last 500 chars): ...{formatted_docs[-500:]}")
+        logger.info(f"Question: {question}")
+        logger.info(f"Chat history messages count: {len(self.chat_history.messages[:-1])}")
+        for i, msg in enumerate(self.chat_history.messages[:-1]):
+            logger.info(f"Message {i}: {type(msg).__name__} - {str(msg.content)[:200]}...")
+        logger.info(f"=== END DEBUG CONTEXT DATA ===")
+        
         return self.question_answering_chain.invoke(
             {
                 "messages": self.chat_history.messages[:-1],
