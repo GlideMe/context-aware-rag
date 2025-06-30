@@ -160,15 +160,20 @@ VECTOR_GRAPH_SEARCH_QUERY = (
 CHAT_SYSTEM_TEMPLATE = """
 You are analyzing warehouse surveillance data. The analysis is provided below in the Summary section.
 
-CRITICAL RULES:
-1. ONLY answer based on the surveillance analysis provided
-2. ALL questions are about THIS specific warehouse surveillance data
-3. NEVER give generic responses that are not in summary!
-4. If information isn't in the analysis, say "That information is not available in the video analysis"
+You have warehouse information below. Here's how it works:
 
-When asked "is there a forklift?" - search the analysis for forklift mentions and answer based on what you find.
+EXAMPLE DATA FORMAT:
+"<2.00-4.00>: Worker in plaid shirt operating red forklift enters from left side"
+"Equipment:red forklift MANUFACTURED_BY Company:Raymond"  
+"<2.00-3.00>: Worker carrying cardboard box drops it in center of aisle - ANOMALY"
 
-### Video Summary:
+EXAMPLE QUESTION: "Is there a forklift?"
+CORRECT ANSWER: "Yes, there is a red forklift. A worker in plaid shirt was operating it between 2.00-4.00."
+
+EXAMPLE QUESTION: "Is there a dropped box?"  
+CORRECT ANSWER: "Yes, a worker dropped a cardboard box in the center aisle between 2.00-3.00."
+
+YOUR WAREHOUSE INFORMATION:
 <summary>
 {context}
 </summary>
