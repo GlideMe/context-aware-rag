@@ -23,7 +23,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
@@ -54,37 +54,6 @@ class LLMTool(Tool, Runnable):
         return getattr(self.llm, attr)
 
     def invoke(self, *args, **kwargs):
-        # Add debug logging for all LLM tools to compare OpenAI vs Claude
-        if hasattr(self, 'name') and 'claude' not in self.name.lower():
-            # This is likely OpenAI - add similar logging
-            if args and hasattr(args[0], '__iter__') and not isinstance(args[0], str):
-                messages = args[0]
-                logger.info(f"=== OPENAI INPUT DEBUG ===")
-                logger.info(f"DEBUG OPENAI INPUT: Number of messages: {len(messages)}")
-                for i, msg in enumerate(messages):
-                    logger.info(f"DEBUG OPENAI INPUT: Message {i} type: {type(msg)}")
-                    
-                    # Log the FULL content without truncation
-                    full_content = str(msg.content) if hasattr(msg, 'content') else str(msg)
-                    logger.info(f"DEBUG OPENAI INPUT: Message {i} content length: {len(full_content)}")
-                    
-                    # Check for context placeholders and video summary sections
-                    if "{context}" in full_content:
-                        logger.info(f"DEBUG OPENAI INPUT: Message {i} contains {{context}} placeholder!")
-                    if "Video Summary:" in full_content or "<summary>" in full_content:
-                        logger.info(f"DEBUG OPENAI INPUT: Message {i} contains Video Summary/summary section!")
-                    
-                    # Split into chunks if too long for single log line
-                    chunk_size = 2000  # Adjust if needed
-                    if len(full_content) <= chunk_size:
-                        logger.info(f"DEBUG OPENAI INPUT: Message {i} content: {full_content}")
-                    else:
-                        logger.info(f"DEBUG OPENAI INPUT: Message {i} content (chunked):")
-                        for chunk_num, chunk_start in enumerate(range(0, len(full_content), chunk_size)):
-                            chunk = full_content[chunk_start:chunk_start + chunk_size]
-                            logger.info(f"DEBUG OPENAI INPUT: Message {i} chunk {chunk_num}: {chunk}")
-                logger.info(f"=== END OPENAI INPUT DEBUG ===")
-        
         return self.llm.invoke(*args, **kwargs)
 
     def stream(self, *args, **kwargs):
@@ -211,32 +180,6 @@ class ClaudeBedrockLLM(BaseChatModel):
     def _format_messages_for_claude(self, messages: List[BaseMessage]) -> Dict[str, Any]:
         """Convert LangChain messages to Claude Bedrock format"""
         formatted_messages = []
-        system_message = None
-        
-        logger.info(f"=== CLAUDE MESSAGE FORMATTING DEBUG ===")
-        logger.info(f"Input messages count: {len(messages)}")
-        
-        for i, msg in enumerate(messages):
-            logger.info(f"Processing message {i}: {type(msg).__name__}")
-            
-            if isinstance(msg, HumanMessage):
-                formatted_messages.append({
-                    "role": "user",
-                    "content": msg.content
-                })
-                logger.info(f"Added HumanMessage as 'user' role")
-            elif isinstance(msg, AIMessage):
-                formatted_messages.append({
-                    "role": "assistant", 
-                    "content": msg.content
-                })
-                logger.info(f"Added AIMessage as 'assistant' role")
-            else:
-                # This might be a SystemMessage - Claude handles these separately
-                logger.info(f"Found non-Human/AI message of type: {type(msg).__name__}")
-                if hasattr(msg, 'content'):
-                    logger.info(f"Setting as system message, content length: {len(str(msg.content))}")
-                    system_message = str(msg.content)
         
         body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -246,53 +189,29 @@ class ClaudeBedrockLLM(BaseChatModel):
             "messages": formatted_messages
         }
         
-        # Add system message if found
-        if system_message:
-            body["system"] = system_message
-            logger.info(f"Added system message to body, length: {len(system_message)}")
-        else:
-            logger.warning("No system message found!")
-        
-        logger.info(f"Final formatted message count: {len(formatted_messages)}")
-        logger.info(f"=== END CLAUDE MESSAGE FORMATTING DEBUG ===")
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                formatted_messages.append({
+                    "role": "user",
+                    "content": msg.content
+                })
+            elif isinstance(msg, AIMessage):
+                formatted_messages.append({
+                    "role": "assistant", 
+                    "content": msg.content
+                })
+            elif isinstance(msg, SystemMessage):
+                # SystemMessage - Claude handles these separately in the "system" field
+                body["system"] = str(msg.content)
         
         return body
     
     def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
         """Generate a single response using Bedrock"""
         try:
-            # ADD DEBUG LOGS HERE
-            logger.info(f"=== CLAUDE INPUT DEBUG ===")
-            logger.info(f"DEBUG CLAUDE INPUT: Number of messages: {len(messages)}")
-            for i, msg in enumerate(messages):
-                logger.info(f"DEBUG CLAUDE INPUT: Message {i} type: {type(msg)}")
-                
-                # Log the FULL content without truncation
-                full_content = str(msg.content)
-                logger.info(f"DEBUG CLAUDE INPUT: Message {i} content length: {len(full_content)}")
-                
-                # Check for context placeholders and video summary sections
-                if "{context}" in full_content:
-                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} contains {{context}} placeholder!")
-                if "Video Summary:" in full_content or "<summary>" in full_content:
-                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} contains Video Summary/summary section!")
-                
-                # Split into chunks if too long for single log line
-                chunk_size = 2000  # Adjust if needed
-                if len(full_content) <= chunk_size:
-                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} content: {full_content}")
-                else:
-                    logger.info(f"DEBUG CLAUDE INPUT: Message {i} content (chunked):")
-                    for chunk_num, chunk_start in enumerate(range(0, len(full_content), chunk_size)):
-                        chunk = full_content[chunk_start:chunk_start + chunk_size]
-                        logger.info(f"DEBUG CLAUDE INPUT: Message {i} chunk {chunk_num}: {chunk}")
-            logger.info(f"=== END CLAUDE INPUT DEBUG ===")
-            # END DEBUG LOGS
-            
-
             # Format messages for Claude
             body = self._format_messages_for_claude(messages)
-            logger.info(f"DEBUG: message body: {json.dumps(body)}")
+            logger.info(f"Claude request body: {json.dumps(body, indent=2)}")
             # Call Bedrock
             response = self.bedrock_client.invoke_model(
                 modelId=self.model_id,
