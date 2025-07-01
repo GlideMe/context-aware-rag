@@ -21,8 +21,7 @@ from typing import Optional, Iterator, Dict, Any, List
 from botocore.exceptions import BotoCoreError, ClientError
 
 try:
-    import google.generativeai as genai
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    from langchain_google_genai import ChatGoogleGenerativeAI
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -353,152 +352,12 @@ class ChatClaudeTool(LLMTool):
         logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
 
 
-class GeminiLLM(BaseChatModel):
-    """Direct Google Generative AI implementation for Gemini"""
-    
-    # Pydantic field declarations
-    model_name: str
-    max_tokens: int = 4096
-    temperature: float = 0.1
-    top_p: float = 0.9
-    client: Any = None
-    
-    def __init__(self, model_name: str, api_key: Optional[str] = None, **kwargs):
-        # Check if Gemini is available
-        if not GEMINI_AVAILABLE:
-            raise ImportError(
-                "Google Generative AI library is not installed. "
-                "Install it with: pip install google-generativeai"
-            )
-        
-        # Pass fields to parent class
-        super().__init__(
-            model_name=model_name,
-            max_tokens=4096,
-            temperature=0.1,
-            top_p=0.9,
-            client=None,
-            **kwargs
-        )
-        
-        # Configure API key
-        api_key = api_key or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "Google API key is required. Set GOOGLE_API_KEY environment variable "
-                "or pass api_key parameter."
-            )
-        
-        # Initialize Gemini client
-        try:
-            genai.configure(api_key=api_key)
-            self.client = genai.GenerativeModel(model_name)
-            logger.info(f"Initialized Gemini client for model: {model_name}")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini client: {e}")
-            raise
-    
-    def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> List[Dict[str, str]]:
-        """Convert LangChain messages to Gemini format"""
-        formatted_messages = []
-        
-        for msg in messages:
-            if isinstance(msg, HumanMessage):
-                formatted_messages.append({
-                    "role": "user",
-                    "parts": [msg.content]
-                })
-            elif isinstance(msg, AIMessage):
-                formatted_messages.append({
-                    "role": "model",
-                    "parts": [msg.content]
-                })
-            elif isinstance(msg, SystemMessage):
-                # Gemini handles system messages as the first user message
-                # We'll prepend system content to the first user message
-                if formatted_messages and formatted_messages[0]["role"] == "user":
-                    formatted_messages[0]["parts"] = [
-                        f"{msg.content}\n\n{formatted_messages[0]['parts'][0]}"
-                    ]
-                else:
-                    # If no user message yet, create one with system content
-                    formatted_messages.insert(0, {
-                        "role": "user",
-                        "parts": [msg.content]
-                    })
-        
-        return formatted_messages
-    
-    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
-        """Generate a single response using Gemini"""
-        try:
-            # Format messages for Gemini
-            formatted_messages = self._format_messages_for_gemini(messages)
-            
-            # Configure generation parameters
-            generation_config = genai.types.GenerationConfig(
-                max_output_tokens=self.max_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p
-            )
-            
-            # Configure safety settings to be permissive (similar to Claude/OpenAI)
-            safety_settings = {
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
-            
-            logger.info(f"Gemini request: {len(formatted_messages)} messages, temp={self.temperature}")
-            
-            # Generate response
-            if len(formatted_messages) == 1:
-                # Single message - use generate_content
-                response = self.client.generate_content(
-                    formatted_messages[0]["parts"][0],
-                    generation_config=generation_config,
-                    safety_settings=safety_settings
-                )
-            else:
-                # Multi-turn conversation - use chat
-                chat = self.client.start_chat(history=formatted_messages[:-1])
-                response = chat.send_message(
-                    formatted_messages[-1]["parts"][0],
-                    generation_config=generation_config,
-                    safety_settings=safety_settings
-                )
-            
-            # Extract content from response
-            content = response.text if hasattr(response, 'text') else ""
-            
-            # Create ChatGeneration
-            generation = ChatGeneration(message=AIMessage(content=content))
-            
-            return ChatResult(generations=[generation])
-            
-        except Exception as e:
-            logger.error(f"Gemini API error: {e}")
-            raise
-    
-    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
-        """Stream response from Gemini (simplified - yields single response)"""
-        # For now, just return the full response
-        # Full streaming would require using the streaming API
-        result = self._generate(messages, stop, **kwargs)
-        yield result.generations[0]
-    
-    @property
-    def _llm_type(self) -> str:
-        return "gemini"
-
-
 class ChatGeminiTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
         if not GEMINI_AVAILABLE:
             raise ImportError(
-                "Google Generative AI library is not installed. "
-                "Install it with: pip install google-generativeai"
+                "LangChain Google GenAI library is not installed. "
+                "Install it with: pip install langchain-google-genai"
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
@@ -511,19 +370,26 @@ class ChatGeminiTool(LLMTool):
         
         logger.info(f"Initializing Gemini client for model: {model_name}")
         
-        # Create our custom Gemini LLM
-        gemini_llm = GeminiLLM(
-            model_name=model_name,
-            api_key=api_key
-        )
+        # Configure API key
+        api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "Google API key is required. Set GOOGLE_API_KEY environment variable "
+                "or pass api_key parameter."
+            )
         
-        # Set initial parameters
-        gemini_llm.max_tokens = max_tokens
-        gemini_llm.temperature = temperature
-        gemini_llm.top_p = top_p
-        
+        # Create LangChain ChatGoogleGenerativeAI instance (similar to ChatOpenAI)
         super().__init__(
-            llm=gemini_llm,
+            llm=ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=api_key,
+                convert_system_message_to_human=True,  # Handle system messages like our Claude fix
+                **llm_params
+            ).configurable_fields(
+                top_p=ConfigurableField(id="top_p"),
+                temperature=ConfigurableField(id="temperature"),
+                max_output_tokens=ConfigurableField(id="max_tokens"),
+            ),
             name="gemini_tool"
         )
         
@@ -558,19 +424,16 @@ class ChatGeminiTool(LLMTool):
                     raise
 
     def update(self, top_p=None, temperature=None, max_tokens=None):
-        """Update Gemini model configuration."""
+        """Update Gemini model configuration with validation and optimization."""
         
+        configurable_dict = {}
         if top_p is not None:
-            top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
-            self.llm.top_p = top_p
-            
+            configurable_dict["top_p"] = max(0.0, min(1.0, float(top_p)))
         if temperature is not None:
-            temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
-            self.llm.temperature = temperature
-            
+            configurable_dict["temperature"] = max(0.0, min(1.0, float(temperature)))
         if max_tokens is not None:
             # Optimize for Gemini 2.5's capabilities
-            max_tokens = max(1, min(32768, int(max_tokens)))  # Gemini 2.5 supports up to 32K tokens
-            self.llm.max_tokens = max_tokens
+            configurable_dict["max_tokens"] = max(1, min(32768, int(max_tokens)))
         
-        logger.debug(f"Updated Gemini LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
+        logger.debug(f"Updating Gemini LLM with config: {configurable_dict}")
+        self.llm = self.llm.with_config(configurable=configurable_dict)
