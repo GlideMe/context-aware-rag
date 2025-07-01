@@ -21,7 +21,7 @@ from typing import Optional, Iterator, Dict, Any, List
 from botocore.exceptions import BotoCoreError, ClientError
 
 try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from vss_ctx_rag.utils.gemini_optimizer import gemini_optimizer, UseCaseType
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -352,23 +352,130 @@ class ChatClaudeTool(LLMTool):
         logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
 
 
+class GeminiLLM(BaseChatModel):
+    """Direct Google API implementation for Gemini models"""
+    
+    # Pydantic field declarations
+    model_name: str
+    api_key: str
+    max_tokens: int = 4096
+    temperature: float = 0.1
+    top_p: float = 0.9
+    
+    def __init__(self, model_name: str, api_key: str, **kwargs):
+        # Pass fields to parent class
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            max_tokens=4096,
+            temperature=0.1,
+            top_p=0.9,
+            **kwargs
+        )
+        
+        if not GEMINI_AVAILABLE:
+            raise ImportError(
+                "Gemini optimizer is not available. "
+                "Check gemini_optimizer.py import"
+            )
+        
+        logger.info(f"Initialized Gemini LLM for model: {model_name}")
+    
+    def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> Dict[str, Any]:
+        """Convert LangChain messages to Gemini format with proper system message handling"""
+        formatted_messages = []
+        system_message = None
+        
+        # First pass: extract system message
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                system_message = str(msg.content)
+                break
+        
+        # Second pass: format user/assistant messages
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                content = str(msg.content)
+                # If we have a system message and this is the first user message, prepend it
+                if system_message and len(formatted_messages) == 0:
+                    content = f"{system_message}\n\n{content}"
+                    system_message = None  # Clear it so we don't add it again
+                
+                formatted_messages.append({
+                    "role": "user",
+                    "parts": [{"text": content}]
+                })
+            elif isinstance(msg, AIMessage):
+                formatted_messages.append({
+                    "role": "model",
+                    "parts": [{"text": str(msg.content)}]
+                })
+        
+        return {
+            "contents": formatted_messages,
+            "generationConfig": {
+                "maxOutputTokens": self.max_tokens,
+                "temperature": self.temperature,
+                "topP": self.top_p,
+            }
+        }
+    
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
+        """Generate a single response using Gemini API"""
+        try:
+            # Format messages for Gemini
+            request_data = self._format_messages_for_gemini(messages)
+            
+            # Call Gemini through optimizer
+            response = gemini_optimizer.generate_content(
+                model_name=self.model_name,
+                api_key=self.api_key,
+                request_data=request_data,
+                use_case=UseCaseType.GENERAL
+            )
+            
+            # Extract content from response
+            content = ""
+            if response and "candidates" in response:
+                candidates = response["candidates"]
+                if candidates and len(candidates) > 0:
+                    candidate = candidates[0]
+                    if "content" in candidate and "parts" in candidate["content"]:
+                        parts = candidate["content"]["parts"]
+                        if parts and len(parts) > 0:
+                            content = parts[0].get("text", "")
+            
+            # Create ChatGeneration
+            generation = ChatGeneration(message=AIMessage(content=content))
+            
+            return ChatResult(generations=[generation])
+            
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            raise
+    
+    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
+        """Stream response from Gemini (simplified - yields single response)"""
+        # For now, just return the full response
+        # Full streaming would require separate streaming implementation
+        result = self._generate(messages, stop, **kwargs)
+        yield result.generations[0]
+    
+    @property
+    def _llm_type(self) -> str:
+        return "gemini-direct-api"
+
+
 class ChatGeminiTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
         if not GEMINI_AVAILABLE:
             raise ImportError(
-                "LangChain Google GenAI library is not installed. "
-                "Install it with: pip install langchain-google-genai"
+                "Gemini optimizer is not available. "
+                "Check gemini_optimizer.py import"
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
-        model_name = model or "gemini-2.5-flash-exp"  # or "gemini-2.5-pro-exp" for higher capability
-        
-        # Extract parameters for our custom LLM
-        max_tokens = llm_params.get("max_tokens", 4096)
-        temperature = llm_params.get("temperature", 0.1)
-        top_p = llm_params.get("top_p", 0.9)
-        
-        logger.info(f"Initializing Gemini client for model: {model_name}")
+        model_name = model or "gemini-2.5-flash-exp"  # or "gemini-2.5-pro-exp"
         
         # Configure API key
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
@@ -378,31 +485,40 @@ class ChatGeminiTool(LLMTool):
                 "or pass api_key parameter."
             )
         
-        # Create LangChain ChatGoogleGenerativeAI instance (similar to ChatOpenAI)
+        # Extract parameters for our custom LLM
+        max_tokens = llm_params.get("max_tokens", 4096)
+        temperature = llm_params.get("temperature", 0.1)
+        top_p = llm_params.get("top_p", 0.9)
+        
+        logger.info(f"Initializing Gemini client for model: {model_name}")
+        
+        # Create our custom Gemini LLM
+        gemini_llm = GeminiLLM(
+            model_name=model_name,
+            api_key=api_key
+        )
+        
+        # Set initial parameters
+        gemini_llm.max_tokens = max_tokens
+        gemini_llm.temperature = temperature
+        gemini_llm.top_p = top_p
+        
         super().__init__(
-            llm=ChatGoogleGenerativeAI(
-                model=model_name,
-                google_api_key=api_key,
-                convert_system_message_to_human=True,  # Handle system messages like our Claude fix
-                **llm_params
-            ).configurable_fields(
-                top_p=ConfigurableField(id="top_p"),
-                temperature=ConfigurableField(id="temperature"),
-                max_output_tokens=ConfigurableField(id="max_tokens"),
-            ),
+            llm=gemini_llm,
             name="gemini_tool"
         )
         
-        # Warmup if enabled
+        # Enhanced warmup with retry logic
         try:
             if os.getenv("CA_RAG_ENABLE_WARMUP", "false").lower() == "true":
                 self.warmup(model_name)
         except Exception as e:
             logger.error(f"Error warming up Gemini LLM: {e}")
+            # Don't raise - allow initialization to continue for graceful degradation
             logger.warning("Continuing without warmup - model will initialize on first use")
     
     def warmup(self, model_name):
-        """Warm up the Gemini model."""
+        """Warm up the Gemini model with retry logic for reliability."""
         max_warmup_attempts = 3
         
         for attempt in range(max_warmup_attempts):
@@ -426,14 +542,18 @@ class ChatGeminiTool(LLMTool):
     def update(self, top_p=None, temperature=None, max_tokens=None):
         """Update Gemini model configuration with validation and optimization."""
         
-        configurable_dict = {}
+        # Validate and optimize parameters for Gemini 2.5
         if top_p is not None:
-            configurable_dict["top_p"] = max(0.0, min(1.0, float(top_p)))
+            top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
+            self.llm.top_p = top_p
+            
         if temperature is not None:
-            configurable_dict["temperature"] = max(0.0, min(1.0, float(temperature)))
+            temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
+            self.llm.temperature = temperature
+            
         if max_tokens is not None:
             # Optimize for Gemini 2.5's capabilities
-            configurable_dict["max_tokens"] = max(1, min(32768, int(max_tokens)))
+            max_tokens = max(1, min(32768, int(max_tokens)))  # Clamp to model limits
+            self.llm.max_tokens = max_tokens
         
-        logger.debug(f"Updating Gemini LLM with config: {configurable_dict}")
-        self.llm = self.llm.with_config(configurable=configurable_dict)
+        logger.debug(f"Updated Gemini LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
