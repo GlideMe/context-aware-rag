@@ -475,7 +475,7 @@ class ChatGeminiTool(LLMTool):
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
-        model_name = model or "gemini-2.5-flash-exp"  # or "gemini-2.5-pro-exp"
+        model_name = model or "gemini-2.5-pro-exp"  # or "gemini-2.5-flash-exp"
         
         # Configure API key
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
