@@ -427,7 +427,7 @@ class GeminiLLM(BaseChatModel):
             request_data = self._format_messages_for_gemini(messages)
             
             # Call Gemini through optimizer
-            response = gemini_optimizer.generate_content(
+            response = gemini_optimizer.generate_response(
                 model_name=self.model_name,
                 api_key=self.api_key,
                 request_data=request_data,
@@ -475,7 +475,7 @@ class ChatGeminiTool(LLMTool):
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
-        model_name = model or "gemini-2.5-pro-exp"  # or "gemini-2.5-flash-exp"
+        model_name = model or "gemini-2.5-pro-exp-03-25"  # or "gemini-2.5-flash-exp"
         
         # Configure API key
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
