@@ -490,9 +490,9 @@ class ContextManagerHandler:
             tasks = []
             task_results = []
             for func, call_params in state.items():
-                logger.info(f"DEBUG CHAT: Question received: '{call_params.get('question', 'NO QUESTION')}'")
-                logger.info(f"DEBUG CHAT: Call params keys: {list(call_params.keys())}")
-                logger.info(f"DEBUG CHAT: Full call params: {call_params}")
+                #logger.info(f"DEBUG CHAT: Question received: '{call_params.get('question', 'NO QUESTION')}'")
+                #logger.info(f"DEBUG CHAT: Call params keys: {list(call_params.keys())}")
+                #logger.info(f"DEBUG CHAT: Full call params: {call_params}")
 
                 tasks.append(
                     asyncio.create_task(self._functions[func](call_params), name=func)
