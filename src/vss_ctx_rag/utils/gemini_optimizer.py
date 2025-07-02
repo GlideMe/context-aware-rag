@@ -44,7 +44,7 @@ class UseCaseType(Enum):
 @dataclass
 class GeminiConfig:
     """Optimized configuration for different use cases."""
-    model_name: str = "gemini-2.5-pro-exp-03-25"
+    model_name: str = "gemini-2.0-pro"
     max_tokens: int = 8192
     temperature: float = 0.1
     top_p: float = 0.9
@@ -135,28 +135,28 @@ class GeminiOptimizer:
         """Load optimized configurations for different use cases."""
         return {
             UseCaseType.SUMMARIZATION: GeminiConfig(
-                model_name="gemini-2.5-pro-exp-03-25",
+                model_name="gemini-2.0-pro",
                 temperature=0.1,  # Lower for consistency
                 max_tokens=8192,  # Higher for comprehensive summaries
                 top_p=0.9,
                 enable_caching=True
             ),
             UseCaseType.CHAT: GeminiConfig(
-                model_name="gemini-2.5-pro-exp-03-25",
+                model_name="gemini-2.0-pro",
                 temperature=0.2,  # Slightly higher for more natural responses
                 max_tokens=4096,  # Moderate for conversations
                 top_p=0.9,
                 enable_caching=False  # Chat responses should be unique
             ),
             UseCaseType.NOTIFICATION: GeminiConfig(
-                model_name="gemini-2.5-pro-exp-03-25",
+                model_name="gemini-2.0-pro",
                 temperature=0.05,  # Very low for consistent alerts
                 max_tokens=1024,   # Short notifications
                 top_p=0.8,
                 enable_caching=True
             ),
             UseCaseType.ANALYSIS: GeminiConfig(
-                model_name="gemini-2.5-pro-exp-03-25",  # Use Pro for complex analysis
+                model_name="gemini-2.0-pro",  # Use Pro for complex analysis
                 temperature=0.1,  # Low for analytical consistency
                 max_tokens=8192,  # High for detailed analysis
                 top_p=0.95,       # Slightly higher for nuanced analysis
