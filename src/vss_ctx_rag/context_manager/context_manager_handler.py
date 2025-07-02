@@ -227,12 +227,14 @@ class ContextManagerHandler:
 
     def configure_update(self, config: Dict, req_info):
         try:
+
+            summ_config = copy.deepcopy(config.get("summarization"))
             caption_summarization_prompt = ""
             summary_aggregation_prompt = ""
             if req_info:
                 caption_summarization_prompt = req_info.caption_summarization_prompt
                 summary_aggregation_prompt = req_info.summary_aggregation_prompt
-            summ_config = copy.deepcopy(config.get("summarization"))
+                summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             try:
                 self.default_caption_prompt = summ_config["prompts"]["caption"]
@@ -251,6 +253,7 @@ class ContextManagerHandler:
                 summ_config["prompts"]["summary_aggregation"] = (
                     summary_aggregation_prompt
                 )
+
             except Exception as e:
                 raise ValueError("Prompt(s) missing!") from e
 
@@ -271,6 +274,7 @@ class ContextManagerHandler:
                             "batch_size": DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE,
                         },
                     )
+                    
                     summ_config["params"]["batch_size"] = summ_config["params"].get(
                         "batch_size", DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE
                     )
@@ -303,6 +307,9 @@ class ContextManagerHandler:
                 self.remove_function("summarization")
                 logger.info("Summarization disabled with the API call")
             chat_config = copy.deepcopy(config.get("chat"))
+
+            if req_info:
+                chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if (
                 req_info
@@ -351,6 +358,7 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_history"] = chat_config["params"].get(
                         "chat_history", DEFAULT_CHAT_HISTORY
                     )
+                    
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)

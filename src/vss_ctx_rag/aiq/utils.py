@@ -47,6 +47,7 @@ class RequestInfo:
         self.notification_temperature = None
         self.notification_max_tokens = None
         self.rag_type = "vector-rag"
+        self.endless_ai_enabled = False
 
 
 def aiq_to_vss_config(
@@ -143,6 +144,7 @@ def create_vss_ctx_rag_config(name: str):
         enable_chat: Optional[bool] = True
         is_live: Optional[bool] = False
         uuid: Optional[str] = "1"
+        endless_ai_enabled: Optional[bool] = False
 
     return VssCtxRagToolConfig
 
