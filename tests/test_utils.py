@@ -20,6 +20,7 @@ namespace = {"re": re}
 exec(func_source, namespace)
 
 is_openai_model = namespace["is_openai_model"]
+from vss_ctx_rag.utils.utils import is_claude_model
 
 @pytest.mark.parametrize("model", [
     "gpt-4o",
@@ -44,4 +45,12 @@ is_openai_model = namespace["is_openai_model"]
 ])
 def test_is_openai_model(model):
     assert is_openai_model(model)
+
+
+@pytest.mark.parametrize("model", [
+    "claude-3-opus-20240229",
+    "claude-instant-1",
+])
+def test_is_claude_model(model):
+    assert is_claude_model(model)
 

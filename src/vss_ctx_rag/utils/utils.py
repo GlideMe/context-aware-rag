@@ -110,6 +110,22 @@ def is_openai_model(model_name: str) -> bool:
     return False
 
 
+def is_claude_model(model_name: str) -> bool:
+    """Return True if the model name refers to an Anthropic Claude model."""
+
+    model = model_name.lower()
+
+    claude_prefixes = (
+        "claude",
+        "anthropic.claude",
+        "anthropic.",
+        "us.anthropic.claude",
+        "us.anthropic.",
+    )
+
+    return any(model.startswith(prefix) for prefix in claude_prefixes)
+
+
 class RequestInfo:
     def __init__(
         self,

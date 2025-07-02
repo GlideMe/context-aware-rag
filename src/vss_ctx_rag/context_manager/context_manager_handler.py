@@ -33,7 +33,11 @@ from vss_ctx_rag.functions.notification import Notifier
 from vss_ctx_rag.functions.summarization import (
     BatchSummarization,
 )
-from vss_ctx_rag.tools.llm import ChatOpenAITool
+from vss_ctx_rag.tools.llm import (
+    LLMTool,
+    ChatOpenAITool,
+    ChatClaudeTool,
+)
 from vss_ctx_rag.tools.notification import AlertSSETool
 from vss_ctx_rag.tools.storage import MilvusDBTool, Neo4jGraphDB
 from vss_ctx_rag.utils.globals import (
@@ -54,7 +58,11 @@ from vss_ctx_rag.functions.rag.graph_rag.graph_retrieval_func import GraphRetrie
 from vss_ctx_rag.functions.rag.vector_rag.vector_retrieval_func import (
     VectorRetrievalFunc,
 )
-from vss_ctx_rag.utils.utils import RequestInfo, is_openai_model
+from vss_ctx_rag.utils.utils import (
+    RequestInfo,
+    is_openai_model,
+    is_claude_model,
+)
 
 
 class ContextManagerHandler:
@@ -92,15 +100,27 @@ class ContextManagerHandler:
         self.curr_doc_index: int = -1
         self.rag_type = None
         self.milvus_db: MilvusDBTool = None
-        self.chat_llm: ChatOpenAITool = None
-        self.llm: ChatOpenAITool = None
-        self.notification_llm: ChatOpenAITool = None
+        self.chat_llm: LLMTool = None
+        self.llm: LLMTool = None
+        self.notification_llm: LLMTool = None
         self._process_index = process_index
         self.neo4j_uri = None
         self.neo4j_username = None
         self.neo4j_password = None
         self.neo4jDB: Neo4jGraphDB = None
         self.configure_init(config, req_info)
+
+    def _create_llm_tool(self, llm_params: Dict) -> LLMTool:
+        model_name = llm_params.get("model", "")
+        if is_openai_model(model_name):
+            api_key = os.getenv("OPENAI_API_KEY")
+            return ChatOpenAITool(api_key=api_key, **llm_params)
+        if is_claude_model(model_name):
+            # Claude models now use AWS Bedrock - no API key needed
+            # AWS credentials are handled via environment variables
+            return ChatClaudeTool(**llm_params)
+        api_key = self.config.get("api_key")
+        return ChatOpenAITool(api_key=api_key, **llm_params)
 
     def setup_neo4j(self, chat_config: Dict):
         try:
@@ -165,16 +185,10 @@ class ContextManagerHandler:
         notification_config = config.get("notification")
         if notification_config and notification_config.get("enable"):
             notification_llm_params = notification_config.get("llm")
-            if is_openai_model(notification_llm_params["model"]):
-                api_key = os.environ["OPENAI_API_KEY"]
-            else:
-                api_key = config["api_key"]
             logger.info(
                 "Using %s as the notification llm", notification_llm_params["model"]
             )
-            notification_llm = ChatOpenAITool(
-                api_key=api_key, **notification_llm_params
-            )
+            notification_llm = self._create_llm_tool(notification_llm_params)
             self.add_function(
                 Notifier("notification")
                 .add_tool(LLM_TOOL_NAME, notification_llm)
@@ -194,21 +208,13 @@ class ContextManagerHandler:
             if chat_config
             else DEFAULT_LLM_PARAMS
         )
-        if is_openai_model(chat_llm_params["model"]):
-            api_key = os.environ["OPENAI_API_KEY"]
-        else:
-            api_key = config["api_key"]
         logger.info("Using %s as the chat llm", chat_llm_params["model"])
-        self.chat_llm = ChatOpenAITool(api_key=api_key, **chat_llm_params)
+        self.chat_llm = self._create_llm_tool(chat_llm_params)
         # Init time Summarization config
         summ_config = copy.deepcopy(config.get("summarization"))
         llm_params = summ_config.get(LLM_TOOL_NAME, DEFAULT_LLM_PARAMS)
-        if is_openai_model(llm_params["model"]):
-            api_key = os.environ["OPENAI_API_KEY"]
-        else:
-            api_key = config["api_key"]
         logger.info("Using %s as the summarization llm", llm_params["model"])
-        self.llm = ChatOpenAITool(api_key=api_key, **llm_params)
+        self.llm = self._create_llm_tool(llm_params)
         # Init time Neo4j config
         if chat_config.get("rag", None) == "graph-rag":
             self.setup_neo4j(chat_config)
@@ -492,6 +498,10 @@ class ContextManagerHandler:
             tasks = []
             task_results = []
             for func, call_params in state.items():
+                #logger.info(f"DEBUG CHAT: Question received: '{call_params.get('question', 'NO QUESTION')}'")
+                #logger.info(f"DEBUG CHAT: Call params keys: {list(call_params.keys())}")
+                #logger.info(f"DEBUG CHAT: Full call params: {call_params}")
+
                 tasks.append(
                     asyncio.create_task(self._functions[func](call_params), name=func)
                 )

@@ -20,11 +20,12 @@ import os
 from pathlib import Path
 import time
 from langchain_community.callbacks import get_openai_callback
+from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
 from schema import Schema
 import base64
 
 from vss_ctx_rag.base import Function
-from vss_ctx_rag.utils.utils import remove_think_tags
+from vss_ctx_rag.utils.utils import remove_think_tags, is_claude_model
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
@@ -113,6 +114,17 @@ class BatchSummarization(Function):
         self.summary_start_time = None
         self.enable_summary = True
 
+    def _get_appropriate_callback(self):
+        """Get the appropriate callback based on the LLM being used"""
+        # Get the LLM from the pipeline
+        llm_tool = self.get_tool(LLM_TOOL_NAME)
+        model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
+        
+        if is_claude_model(model_name):
+            return get_bedrock_anthropic_callback()
+        else:
+            return get_openai_callback()
+
     async def acall(self, state: dict):
         """batch summarization function call
 
@@ -173,7 +185,7 @@ class BatchSummarization(Function):
                 logger.error("No batch summaries found")
             elif len(batches) > 0:
                 with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
-                    with get_openai_callback() as cb:
+                    with self._get_appropriate_callback() as cb:
 
                         async def aggregate_token_safe(batch, retries_left):
                             try:
@@ -375,7 +387,7 @@ class BatchSummarization(Function):
                             "Batch %d is full. Processing ...", batch._batch_index
                         )
                         try:
-                            with get_openai_callback() as cb:
+                            with self._get_appropriate_callback() as cb:
                                 if self.endless_ai_enabled:
                                     def image_file_to_base64(filepath):
                                         # Open the image file in binary mode
