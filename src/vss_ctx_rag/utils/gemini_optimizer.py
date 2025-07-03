@@ -323,8 +323,16 @@ class GeminiOptimizer:
                     )
                 
                 # Extract response
-                response_text = response.text if hasattr(response, 'text') else ""
-                
+                # FIXED (HANDLES SAFETY FILTERS)
+                try:
+                    response_text = response.text if hasattr(response, 'text') else ""
+                except ValueError as e:
+                    if "finish_reason" in str(e):
+                        logger.warning(f"Gemini safety filter triggered, using partial response: {e}")
+                        response_text = "Content filtered by safety settings"
+                    else:
+                        raise e
+                                
                 # Track performance
                 response_time = time.time() - start_time
                 self._performance_metrics[use_case.value].append(response_time)
