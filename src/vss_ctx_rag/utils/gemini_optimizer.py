@@ -142,7 +142,20 @@ class GeminiOptimizer:
                 top_p=0.9,
                 enable_caching=True
             ),
-            # ... other configs ...
+            UseCaseType.CHAT: GeminiConfig(
+                model_name="models/gemini-2.5-pro",
+                temperature=0.2,  # Slightly higher for more natural responses
+                max_tokens=4096,  # Moderate for conversations
+                top_p=0.9,
+                enable_caching=False  # Chat responses should be unique
+            ),
+            UseCaseType.NOTIFICATION: GeminiConfig(
+                model_name="models/gemini-2.5-pro",
+                temperature=0.05,  # Very low for consistent alerts
+                max_tokens=1024,   # Short notifications
+                top_p=0.8,
+                enable_caching=True
+            ),
             UseCaseType.ANALYSIS: GeminiConfig(
                 model_name="models/gemini-2.5-pro",  # Use Pro for complex analysis
                 temperature=0.1,  # Low for analytical consistency
