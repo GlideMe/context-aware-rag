@@ -469,19 +469,44 @@ class GraphExtraction:
     async def update_embeddings(self, rows):
         with TimeMeasure("GraphExtraction/UpdatEmbding", "yellow"):
             logger.info("update embedding for entities")
-            tasks = [
-                asyncio.create_task(self.graph_db.embeddings.aembed_query(row["text"]))
-                for row in rows
-            ]
-            results = await asyncio.gather(*tasks)
-            for i, row in enumerate(rows):
-                row["embedding"] = results[i]
-            query = """
-            UNWIND $rows AS row
-            MATCH (e) WHERE elementId(e) = row.elementId
-            CALL db.create.setNodeVectorProperty(e, "embedding", row.embedding)
-            """
-            return self.graph_db.graph_db.query(query, params={"rows": rows})
+            
+            # Retry logic for NVIDIA rate limits
+            max_retries = 5
+            base_delay = 1.0
+            
+            for attempt in range(max_retries):
+                try:
+                    tasks = [
+                        asyncio.create_task(self.graph_db.embeddings.aembed_query(row["text"]))
+                        for row in rows
+                    ]
+                    results = await asyncio.gather(*tasks)
+                    
+                    for i, row in enumerate(rows):
+                        row["embedding"] = results[i]
+                        
+                    query = """
+                    UNWIND $rows AS row
+                    MATCH (e) WHERE elementId(e) = row.elementId
+                    CALL db.create.setNodeVectorProperty(e, "embedding", row.embedding)
+                    """
+                    return self.graph_db.graph_db.query(query, params={"rows": rows})
+                    
+                except Exception as e:
+                    error_str = str(e)
+                    if "429" in error_str or "Too Many Requests" in error_str:
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)  # Exponential backoff
+                            logger.warning(f"NVIDIA API rate limit hit (attempt {attempt + 1}/{max_retries}). Retrying in {delay}s...")
+                            await asyncio.sleep(delay)
+                            continue
+                        else:
+                            logger.error(f"All {max_retries} attempts failed due to rate limits")
+                            raise
+                    else:
+                        # Non-rate-limit error, don't retry
+                        logger.error(f"Non-rate-limit error in update_embeddings: {e}")
+                        raise
 
     def create_chunk_vector_index(self):
         try:

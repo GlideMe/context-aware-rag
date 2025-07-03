@@ -37,6 +37,7 @@ from vss_ctx_rag.tools.llm import (
     LLMTool,
     ChatOpenAITool,
     ChatClaudeTool,
+    ChatGeminiTool,
 )
 from vss_ctx_rag.tools.notification import AlertSSETool
 from vss_ctx_rag.tools.storage import MilvusDBTool, Neo4jGraphDB
@@ -62,6 +63,7 @@ from vss_ctx_rag.utils.utils import (
     RequestInfo,
     is_openai_model,
     is_claude_model,
+    is_gemini_model,
 )
 
 
@@ -119,6 +121,9 @@ class ContextManagerHandler:
             # Claude models now use AWS Bedrock - no API key needed
             # AWS credentials are handled via environment variables
             return ChatClaudeTool(**llm_params)
+        if is_gemini_model(model_name):
+            api_key = os.getenv("GOOGLE_API_KEY")
+            return ChatGeminiTool(api_key=api_key, **llm_params)
         api_key = self.config.get("api_key")
         return ChatOpenAITool(api_key=api_key, **llm_params)
 
