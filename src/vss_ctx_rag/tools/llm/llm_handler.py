@@ -452,7 +452,7 @@ class GeminiLLM(BaseChatModel):
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             raise
-            
+
     def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
         """Stream response from Gemini (simplified - yields single response)"""
         # For now, just return the full response
@@ -474,7 +474,7 @@ class ChatGeminiTool(LLMTool):
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
-        model_name = model or "models/gemini-2.5-pro"  # or "gemini-2.5-flash-exp"
+        model_name = model or "models/gemini-2.5-flash"  # or "gemini-2.5-flash-exp"
         
         # Configure API key
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
