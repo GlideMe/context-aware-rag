@@ -426,24 +426,23 @@ class GeminiLLM(BaseChatModel):
             # Format messages for Gemini
             request_data = self._format_messages_for_gemini(messages)
             
+            # Extract messages from request_data for optimizer
+            formatted_messages = request_data.get("contents", [])
+            messages_for_optimizer = []
+            for msg in formatted_messages:
+                if msg.get("role") == "user":
+                    messages_for_optimizer.append({"role": "user", "content": msg["parts"][0]["text"]})
+                elif msg.get("role") == "model":
+                    messages_for_optimizer.append({"role": "assistant", "content": msg["parts"][0]["text"]})
+            
             # Call Gemini through optimizer
             response = gemini_optimizer.generate_response(
-                model_name=self.model_name,
-                api_key=self.api_key,
-                request_data=request_data,
+                messages=messages_for_optimizer,
                 use_case=UseCaseType.GENERAL
             )
             
-            # Extract content from response
-            content = ""
-            if response and "candidates" in response:
-                candidates = response["candidates"]
-                if candidates and len(candidates) > 0:
-                    candidate = candidates[0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        parts = candidate["content"]["parts"]
-                        if parts and len(parts) > 0:
-                            content = parts[0].get("text", "")
+            # Extract content from optimizer response
+            content = response.get("content", "")
             
             # Create ChatGeneration
             generation = ChatGeneration(message=AIMessage(content=content))
@@ -453,7 +452,7 @@ class GeminiLLM(BaseChatModel):
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             raise
-    
+            
     def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
         """Stream response from Gemini (simplified - yields single response)"""
         # For now, just return the full response
