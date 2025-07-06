@@ -355,24 +355,31 @@ class ChatClaudeTool(LLMTool):
 class GeminiLLM(BaseChatModel):
     """Direct Google API implementation for Gemini models"""
     
-    # Pydantic field declarations
+class GeminiLLM(BaseChatModel):
+    """Direct Google API implementation for Gemini models"""
+    
+    # Pydantic field declarations - NO hardcoded defaults
     model_name: str
     api_key: str
-    max_tokens: int = 4096
-    temperature: float = 0.1
-    top_p: float = 0.9
+    max_tokens: int
+    temperature: float
+    top_p: float
     
     def __init__(self, model_name: str, api_key: str, **kwargs):
-        # Pass fields to parent class
+        # Extract config values with fallback defaults
+        max_tokens = kwargs.get('max_tokens', 4096)
+        temperature = kwargs.get('temperature', 0.1) 
+        top_p = kwargs.get('top_p', 0.9)
+        
+        # Pass extracted values to parent class
         super().__init__(
             model_name=model_name,
             api_key=api_key,
-            max_tokens=4096,
-            temperature=0.1,
-            top_p=0.9,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
             **kwargs
         )
-        
         if not GEMINI_AVAILABLE:
             raise ImportError(
                 "Gemini optimizer is not available. "
