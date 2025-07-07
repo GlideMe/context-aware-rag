@@ -41,7 +41,7 @@ from vss_ctx_rag.utils.utils import (
 )
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
-from typing import Optional, Iterator, Dict, Any, List
+
 
 class LLMTool(Tool, Runnable):
     """A Tool class wrapper for LLMs.
@@ -154,23 +154,30 @@ class ClaudeBedrockLLM(BaseChatModel):
     
     # Pydantic field declarations
     model_id: str
-    region_name: str = "us-east-1"
-    max_tokens: int = 4096
-    temperature: float = 0.1
-    top_p: float = 0.9
+    region_name: str
+    max_tokens: int
+    temperature: float
+    top_p: float
     bedrock_client: Any = None
     
-    def __init__(self, model_id: str, region_name: str = "us-east-1", **kwargs):
+    def __init__(self, model_id: str, region_name: str = "us-east-1", llm_params: dict = None, **kwargs):
+        if llm_params is None:
+            llm_params = {}
+            
+        max_tokens = llm_params.get("max_tokens", 4096)
+        temperature = llm_params.get("temperature", 0.1)
+        top_p = llm_params.get("top_p", 0.9)
+        
         # Pass fields to parent class
         super().__init__(
             model_id=model_id,
             region_name=region_name,
-            max_tokens=4096,
-            temperature=0.1,
-            top_p=0.9,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
             bedrock_client=None,
             **kwargs
-        )
+        )                               
         
         # Initialize boto3 client
         try:
@@ -266,7 +273,7 @@ class ChatClaudeTool(LLMTool):
         
         # Set optimal defaults for Claude Sonnet performance and cost balance
         region_name = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-        model_id = model or "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        model_id = model or "us.anthropic.claude-sonnet-4-20250514-v1:0"
         
         # Extract parameters for our custom LLM
         max_tokens = llm_params.get("max_tokens", 4096)
@@ -278,13 +285,10 @@ class ChatClaudeTool(LLMTool):
         # Create our custom boto3-based LLM
         claude_llm = ClaudeBedrockLLM(
             model_id=model_id,
-            region_name=region_name
+            region_name=region_name,
+            llm_params=llm_params
         )
         
-        # Set initial parameters
-        claude_llm.max_tokens = max_tokens
-        claude_llm.temperature = temperature
-        claude_llm.top_p = top_p
         
         super().__init__(
             llm=claude_llm,

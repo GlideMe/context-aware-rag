@@ -162,6 +162,7 @@ class RequestInfo:
         notification_temperature: Optional[float] = None,
         notification_max_tokens: Optional[int] = None,
         rag_type: Optional[str] = None,
+        endless_ai_enabled: bool = False,
     ):
         self.summarize = summarize
         self.enable_chat = enable_chat
@@ -181,6 +182,7 @@ class RequestInfo:
         self.notification_temperature = notification_temperature
         self.notification_max_tokens = notification_max_tokens
         self.rag_type = rag_type
+        self.endless_ai_enabled = endless_ai_enabled
 
 
 def validate_config(config: Dict[str, Any]) -> None:
