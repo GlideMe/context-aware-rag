@@ -260,6 +260,7 @@ class GraphExtraction:
                 WITH data, c
                 SET c.start_time = CASE WHEN data.start_time IS NOT NULL THEN data.start_time END,
                     c.end_time = CASE WHEN data.end_time IS NOT NULL THEN data.end_time END,
+                    c.grid_filenames = CASE WHEN data.grid_filenames IS NOT NULL THEN data.grid_filenames END,
                     c.chunkIdx = data.chunkIdx
                 WITH data, c
                 MATCH (d:Document {uuid: data.uuid})
