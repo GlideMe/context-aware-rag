@@ -287,7 +287,7 @@ class BatchSummarization(Function):
                 logger.error("No batch summaries found")
             elif len(batches) > 0:
                 with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
-                    with get_openai_callback() as cb:
+                    with self._get_appropriate_callback() as cb:
                         result = await call_token_safe(
                             batches,
                             self.aggregation_pipeline,
@@ -370,7 +370,7 @@ class BatchSummarization(Function):
 
             if self.summary_start_time is None:
                 self.summary_start_time = bs.start_time
-                
+
             self.metrics.summary_latency = bs.end_time - self.summary_start_time
         except Exception as e:
             logger.error(e)

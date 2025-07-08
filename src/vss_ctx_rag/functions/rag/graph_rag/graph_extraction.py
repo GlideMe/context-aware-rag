@@ -222,6 +222,9 @@ class GraphExtraction:
                     "chunkIdx": chunk_document.metadata["chunkIdx"],
                 }
 
+                if ("grid_filenames" in chunk.source.metadata):
+                    chunk_data["grid_filenames"] = chunk.source.metadata["grid_filenames"]
+                    
                 if (
                     "start_ntp_float" in chunk.source.metadata
                     and "end_ntp_float" in chunk.source.metadata
