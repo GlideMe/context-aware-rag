@@ -48,6 +48,9 @@ dependencies = [
   "matplotlib==3.10.0"
 ]
 
+[tool.uv]
+managed = true
+
 [project.entry-points."aiq.components"]
 aiq_vss_ctx_rag_ingestion = "vss_ctx_rag.aiq.register_in"
 aiq_vss_ctx_rag_retrieval = "vss_ctx_rag.aiq.register_ret"

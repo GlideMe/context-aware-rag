@@ -40,7 +40,10 @@ from vss_ctx_rag.functions.rag.graph_rag.constants import (
     HYBRID_SEARCH_FULL_TEXT_QUERY,
     FILTER_LABELS,
 )
-from vss_ctx_rag.utils.globals import DEFAULT_EMBEDDING_PARALLEL_COUNT
+from vss_ctx_rag.utils.globals import (
+    DEFAULT_EMBEDDING_PARALLEL_COUNT,
+    DEFAULT_CONCURRENT_EMBEDDING_LIMIT,
+)
 
 
 class GraphExtraction:
@@ -73,6 +76,9 @@ class GraphExtraction:
         self.previous_chunk_id = 0
         self.last_position = 0
         self.embedding_parallel_count = embedding_parallel_count
+        self._embedding_semaphore = asyncio.Semaphore(
+            DEFAULT_CONCURRENT_EMBEDDING_LIMIT
+        )
 
     def handle_backticks_nodes_relationship_id_type(
         self, graph_document_list: List[GraphDocument]
@@ -136,11 +142,14 @@ class GraphExtraction:
         ):
             data_for_query = []
             logger.info("update embedding and vector index for chunks")
+
+            async def semaphore_controlled_embed(content):
+                async with self._embedding_semaphore:
+                    return await self.graph_db.embeddings.aembed_query(content)
+
             tasks = [
                 asyncio.create_task(
-                    self.graph_db.embeddings.aembed_query(
-                        row["chunk_doc"].source.page_content
-                    )
+                    semaphore_controlled_embed(row["chunk_doc"].source.page_content)
                 )
                 for row in chunkId_chunkDoc_list
             ]
@@ -213,9 +222,6 @@ class GraphExtraction:
                     "chunkIdx": chunk_document.metadata["chunkIdx"],
                 }
 
-                if ("grid_filenames" in chunk.source.metadata):
-                    chunk_data["grid_filenames"] = chunk.source.metadata["grid_filenames"]
-
                 if (
                     "start_ntp_float" in chunk.source.metadata
                     and "end_ntp_float" in chunk.source.metadata
@@ -251,7 +257,6 @@ class GraphExtraction:
                 WITH data, c
                 SET c.start_time = CASE WHEN data.start_time IS NOT NULL THEN data.start_time END,
                     c.end_time = CASE WHEN data.end_time IS NOT NULL THEN data.end_time END,
-                    c.grid_filenames = CASE WHEN data.grid_filenames IS NOT NULL THEN data.grid_filenames END,
                     c.chunkIdx = data.chunkIdx
                 WITH data, c
                 MATCH (d:Document {uuid: data.uuid})
@@ -469,44 +474,24 @@ class GraphExtraction:
     async def update_embeddings(self, rows):
         with TimeMeasure("GraphExtraction/UpdatEmbding", "yellow"):
             logger.info("update embedding for entities")
-            
-            # Retry logic for NVIDIA rate limits
-            max_retries = 5
-            base_delay = 1.0
-            
-            for attempt in range(max_retries):
-                try:
-                    tasks = [
-                        asyncio.create_task(self.graph_db.embeddings.aembed_query(row["text"]))
-                        for row in rows
-                    ]
-                    results = await asyncio.gather(*tasks)
-                    
-                    for i, row in enumerate(rows):
-                        row["embedding"] = results[i]
-                        
-                    query = """
-                    UNWIND $rows AS row
-                    MATCH (e) WHERE elementId(e) = row.elementId
-                    CALL db.create.setNodeVectorProperty(e, "embedding", row.embedding)
-                    """
-                    return self.graph_db.graph_db.query(query, params={"rows": rows})
-                    
-                except Exception as e:
-                    error_str = str(e)
-                    if "429" in error_str or "Too Many Requests" in error_str:
-                        if attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)  # Exponential backoff
-                            logger.warning(f"NVIDIA API rate limit hit (attempt {attempt + 1}/{max_retries}). Retrying in {delay}s...")
-                            await asyncio.sleep(delay)
-                            continue
-                        else:
-                            logger.error(f"All {max_retries} attempts failed due to rate limits")
-                            raise
-                    else:
-                        # Non-rate-limit error, don't retry
-                        logger.error(f"Non-rate-limit error in update_embeddings: {e}")
-                        raise
+
+            async def semaphore_controlled_embed(text):
+                async with self._embedding_semaphore:
+                    return await self.graph_db.embeddings.aembed_query(text)
+
+            tasks = [
+                asyncio.create_task(semaphore_controlled_embed(row["text"]))
+                for row in rows
+            ]
+            results = await asyncio.gather(*tasks)
+            for i, row in enumerate(rows):
+                row["embedding"] = results[i]
+            query = """
+            UNWIND $rows AS row
+            MATCH (e) WHERE elementId(e) = row.elementId
+            CALL db.create.setNodeVectorProperty(e, "embedding", row.embedding)
+            """
+            return self.graph_db.graph_db.query(query, params={"rows": rows})
 
     def create_chunk_vector_index(self):
         try:
@@ -560,6 +545,7 @@ class GraphExtraction:
             ]
             combined_chunk_document_list = self.get_combined_chunks(docs)
 
+            graph_documents = []
             with TimeMeasure("GraphRAG/aprocess-doc/graph-create/convert", "blue"):
                 graph_documents = await self.transformer.aconvert_to_graph_documents(
                     combined_chunk_document_list

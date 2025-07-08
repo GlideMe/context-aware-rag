@@ -41,7 +41,7 @@ chat:
     model: meta/llama-3.1-70b-instruct
     base_url: https://integrate.api.nvidia.com/v1
     max_tokens: 2048
-    temperature: 0.2
+    temperature: 0.5
     top_p: 0.7
   embedding:
     model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
