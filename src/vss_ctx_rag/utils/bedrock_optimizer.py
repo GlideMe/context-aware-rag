@@ -34,11 +34,11 @@ class BedrockOptimizer:
         """Get basic configuration without complex optimization."""
         # Simple, consistent configuration regardless of use case
         return {
-            "model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+            "model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0", #fix get from config 
             "region": "us-east-1",
-            "max_tokens": 4096,
-            "temperature": 0.1,
-            "top_p": 0.9,
+            "max_tokens": 4096,#fix get from config
+            "temperature": 0.1,#fix get from config
+            "top_p": 0.9,#fix get from config
             "max_retries": 3,
             "base_delay": 1.0
         }
