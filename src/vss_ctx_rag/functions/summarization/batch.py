@@ -131,9 +131,13 @@ class BatchSummarization(Function):
         """Process a full batch immediately"""
         with TimeMeasure(
             "Batch "
-            + str(self.batcher.get_batch_index(doc_i))
+            + str(batch._batch_index)
             + " Summary IS LAST "
-            + str(doc_meta["is_last"]),
+            + str(
+                any(
+                    doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
+                )
+            ),
             "pink",
         ):
             logger.info(
@@ -172,9 +176,7 @@ class BatchSummarization(Function):
                 batch_summary = "."
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
-            logger.info(
-                "Batch %d summary: %s", batch._batch_index, batch_summary
-            )
+            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
             logger.info(
                 "Total Tokens: %s, "
                 "Prompt Tokens: %s, "
@@ -201,9 +203,7 @@ class BatchSummarization(Function):
 
             # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
             # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
-            self.vector_db.add_summary(
-                summary=batch_summary, metadata=batch_meta
-            )
+            self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
         except Exception as e:
             logger.error(e)
 
