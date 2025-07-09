@@ -460,10 +460,10 @@ class GraphExtraction:
         logger.debug(f"Embedding parallel count: {self.embedding_parallel_count}")
         with TimeMeasure("GraphExtraction/FetchEntEmbd", "green"):
             rows = self.fetch_entities_for_embedding()
-        logger.info(f"DEBUG: Total entities to embed: {len(rows)}")
-        logger.info(f"DEBUG: First 5 entities: {[row['text'][:50] for row in rows[:5]]}")
-        logger.info(f"DEBUG: Batch size: {self.embedding_parallel_count}")
-        logger.info(f"DEBUG: Number of batches: {len(rows) // self.embedding_parallel_count + 1}")
+        #logger.info(f"DEBUG: Total entities to embed: {len(rows)}")
+        #logger.info(f"DEBUG: First 5 entities: {[row['text'][:50] for row in rows[:5]]}")
+        #logger.info(f"DEBUG: Batch size: {self.embedding_parallel_count}")
+        #logger.info(f"DEBUG: Number of batches: {len(rows) // self.embedding_parallel_count + 1}")
         for i in range(0, len(rows), self.embedding_parallel_count):
             await self.update_embeddings(rows[i : i + self.embedding_parallel_count])
 
