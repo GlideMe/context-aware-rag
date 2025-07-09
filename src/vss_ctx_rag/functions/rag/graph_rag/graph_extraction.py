@@ -489,6 +489,7 @@ class GraphExtraction:
                 async with self._embedding_semaphore:
                     active_requests = 250 - self._embedding_semaphore._value
                     logger.info(f"ENTITY EMBED DEBUG: Active requests: {active_requests}/250")
+                    await asyncio.sleep(0.1)  # 100ms delay between requests
                     return await self.graph_db.embeddings.aembed_query(text)
 
             tasks = [
