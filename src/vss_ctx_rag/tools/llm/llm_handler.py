@@ -216,6 +216,14 @@ class ClaudeBedrockLLM(BaseChatModel):
             elif isinstance(msg, SystemMessage):
                 # SystemMessage - Claude handles these separately in the "system" field
                 body["system"] = str(msg.content)
+
+        # ADD THIS DEBUG LOG RIGHT BEFORE THE RETURN:
+        logger.info(f"CLAUDE CHAT DEBUG: Body being sent to Claude:")
+        logger.info(f"CLAUDE CHAT DEBUG: System message: {body.get('system', 'NONE')[:500]}...")
+        logger.info(f"CLAUDE CHAT DEBUG: Number of messages: {len(formatted_messages)}")
+        if formatted_messages:
+            logger.info(f"CLAUDE CHAT DEBUG: Last user message: {formatted_messages[-1]['content'][:200]}...")
+        
         
         return body
     
