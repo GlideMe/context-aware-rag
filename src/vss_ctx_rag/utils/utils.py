@@ -101,13 +101,17 @@ def is_openai_model(model_name: str) -> bool:
         "chatgpt",
         "tts-",
         "whisper-",
+        "computer-use-",
+        "text-embedding-",
+        "omni-",
     )
 
     if any(model.startswith(prefix) for prefix in openai_prefixes):
         return True
 
     # Matches o models like "o1", "o1-preview", "o3-mini", "o4-mini" etc.
-    if re.match(r"^[o]\d", model):
+    # Also handle zero prefix variants like "01-mini"
+    if re.match(r"^[o0]\d", model):
         return True
 
     return False
@@ -127,6 +131,24 @@ def is_claude_model(model_name: str) -> bool:
     )
 
     return any(model.startswith(prefix) for prefix in claude_prefixes)
+
+
+def model_supports_multimodal_messages(model_name: str) -> bool:
+    """Return True if the model supports multimodal (text + image) messages."""
+
+    model = model_name.lower()
+
+    multimodal_substrings = [
+        "gpt-4o",
+        "gpt-4-vision",
+        "gpt-4v",
+        "gpt-4-turbo",
+        "gpt-4-1106",
+        "gpt-4-turbo-preview",
+        "claude-3",
+    ]
+
+    return any(sub in model for sub in multimodal_substrings)
 
 
 class RequestInfo:

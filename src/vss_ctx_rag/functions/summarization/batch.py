@@ -25,7 +25,11 @@ from schema import Schema
 import base64
 
 from vss_ctx_rag.base import Function
-from vss_ctx_rag.utils.utils import remove_think_tags, is_claude_model
+from vss_ctx_rag.utils.utils import (
+    remove_think_tags,
+    is_claude_model,
+    model_supports_multimodal_messages,
+)
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
@@ -60,17 +64,24 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
-            # start with the user text
-            content_blocks = [{"type": "text", "text": inputs["input"]}]
+            llm_tool = self.get_tool(LLM_TOOL_NAME)
+            model_name = getattr(llm_tool.llm, "model_id", "") or getattr(llm_tool.llm, "model", "")
+            supports_images = model_supports_multimodal_messages(model_name)
 
-            # Add image blocks if any are present
             images = inputs.get("images", [])
-            if images:
+            if not supports_images or not images:
+                human = HumanMessage(content=inputs["input"])
+            else:
+                content_blocks = [{"type": "text", "text": inputs["input"]}]
                 content_blocks += [
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
                 ]
+                human = HumanMessage(content=content_blocks)
 
-            return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
+            return [
+                SystemMessage(content=self.get_param("prompts", "caption_summarization")),
+                human,
+            ]
 
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [

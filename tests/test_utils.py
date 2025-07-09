@@ -1,6 +1,9 @@
 import os
+import sys
 import ast
 import re
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import pytest
 
@@ -10,17 +13,20 @@ with open(utils_path) as f:
     source = f.read()
 
 module = ast.parse(source)
-func_source = None
+openai_src = None
+claude_src = None
 for node in module.body:
     if isinstance(node, ast.FunctionDef) and node.name == "is_openai_model":
-        func_source = ast.get_source_segment(source, node)
-        break
+        openai_src = ast.get_source_segment(source, node)
+    if isinstance(node, ast.FunctionDef) and node.name == "is_claude_model":
+        claude_src = ast.get_source_segment(source, node)
 
 namespace = {"re": re}
-exec(func_source, namespace)
+exec(openai_src, namespace)
+exec(claude_src, namespace)
 
 is_openai_model = namespace["is_openai_model"]
-from vss_ctx_rag.utils.utils import is_claude_model
+is_claude_model = namespace["is_claude_model"]
 
 @pytest.mark.parametrize("model", [
     "gpt-4o",

@@ -34,7 +34,11 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from vss_ctx_rag.utils.ctx_rag_logger import TimeMeasure, logger
-from vss_ctx_rag.utils.utils import remove_think_tags, remove_lucene_chars
+from vss_ctx_rag.utils.utils import (
+    remove_think_tags,
+    remove_lucene_chars,
+    model_supports_multimodal_messages,
+)
 from vss_ctx_rag.functions.rag.graph_rag.constants import (
     CHAT_SEARCH_KWARG_SCORE_THRESHOLD,
     QUESTION_TRANSFORM_TEMPLATE,
@@ -78,21 +82,34 @@ class GraphRetrieval:
         self.chat_history_summarization_chain = summarization_prompt | llm
 
         def prepare_messages(inputs):
-            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE)]
+            messages = [
+                SystemMessage(
+                    content=CHAT_SYSTEM_GRID_TEMPLATE
+                    if self.endless_ai_enabled
+                    else CHAT_SYSTEM_TEMPLATE
+                )
+            ]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
 
-            content_blocks = [{"type": "text", "text": f"User question: {inputs['input']}"}]
-            # Add image blocks if any are present
-            if self.endless_ai_enabled:
-                images = inputs.get("images", [])
-                if images:
-                    content_blocks += [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                    ]
+            llm_name = getattr(self.chat_llm, "model_id", "") or getattr(self.chat_llm, "model", "")
+            supports_images = model_supports_multimodal_messages(llm_name)
 
-            messages.append(HumanMessage(content=content_blocks))
+            images = inputs.get("images", []) if self.endless_ai_enabled else []
+            if not supports_images or not images:
+                human = HumanMessage(content=f"User question: {inputs['input']}")
+            else:
+                content_blocks = [
+                    {"type": "text", "text": f"User question: {inputs['input']}"}
+                ]
+                content_blocks += [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}}
+                    for img in images
+                ]
+                human = HumanMessage(content=content_blocks)
+
+            messages.append(human)
 
             return messages
 
