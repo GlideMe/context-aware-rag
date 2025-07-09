@@ -218,9 +218,8 @@ class ClaudeBedrockLLM(BaseChatModel):
                 body["system"] = str(msg.content)
 
         # ADD THIS DEBUG LOG RIGHT BEFORE THE RETURN:
-        logger.info(f"CLAUDE CHAT DEBUG: Body being sent to Claude:")
-        logger.info(f"CLAUDE CHAT DEBUG: System message: {body.get('system', 'NONE')[:500]}...")
-        logger.info(f"CLAUDE CHAT DEBUG: Number of messages: {len(formatted_messages)}")
+        logger.info(f"CLAUDE CHAT DEBUG: Complete body being sent to Claude:")
+        logger.info(f"{json.dumps(body, indent=2)}")
         if formatted_messages:
             logger.info(f"CLAUDE CHAT DEBUG: Last user message: {formatted_messages[-1]['content'][:200]}...")
         
