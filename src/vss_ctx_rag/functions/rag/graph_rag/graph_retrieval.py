@@ -78,7 +78,10 @@ class GraphRetrieval:
         self.chat_history_summarization_chain = summarization_prompt | llm
 
         def prepare_messages(inputs):
-            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE)]
+            context = inputs.get("context", "")
+            template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
+            system_content = template.format(context=context)
+            messages = [SystemMessage(content=system_content)]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
@@ -114,11 +117,11 @@ class GraphRetrieval:
                 index_name=index_name,
                 retrieval_query=retrieval_query,
                 graph=self.graph_db.graph_db,
-                search_type="hybrid",
+                search_type="hybrid" if self.multi_channel else "vector",
                 node_label=node_label,
                 embedding_node_property=embedding_node_property,
                 text_node_properties=text_node_properties,
-                keyword_index_name=keyword_index,
+                keyword_index_name=keyword_index if self.multi_channel else None,
             )
             logger.info(
                 f"Successfully retrieved Neo4jVector Fulltext index '{index_name}' and keyword index '{keyword_index}'"
@@ -143,6 +146,9 @@ class GraphRetrieval:
                     search_kwargs={
                         "k": search_k,
                         "score_threshold": CHAT_SEARCH_KWARG_SCORE_THRESHOLD,
+                        "filter": {"uuid": self.uuid}
+                        if not self.multi_channel
+                        else None,
                         "params": {"uuid": self.uuid}
                         if not self.multi_channel
                         else {"uuid": None},
