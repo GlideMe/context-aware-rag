@@ -36,12 +36,14 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from vss_ctx_rag.utils.utils import call_token_safe
 
 
 class BatchSummarization(Function):
     """Batch Summarization Function"""
 
     config: dict
+    batch_prompt: str
     aggregation_prompt: str
     output_parser = StrOutputParser()
     batch_size: int
@@ -125,6 +127,86 @@ class BatchSummarization(Function):
         else:
             return get_openai_callback()
 
+    async def _process_full_batch(self, batch):
+        """Process a full batch immediately"""
+        with TimeMeasure(
+            "Batch "
+            + str(batch._batch_index)
+            + " Summary IS LAST "
+            + str(
+                any(
+                    doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
+                )
+            ),
+            "pink",
+        ):
+            logger.info(
+                "Batch %d is full. Processing ...", batch._batch_index
+            )
+            try:
+                with self._get_appropriate_callback() as cb:
+                    if self.endless_ai_enabled:
+                        def image_file_to_base64(filepath):
+                            # Open the image file in binary mode
+                            with open(filepath, 'rb') as image_file:
+                                image_data = image_file.read()
+
+                            # Encode the binary data to base64
+                            base64_data = base64.b64encode(image_data)
+
+                            # Convert bytes to a string (optional)
+                            return base64_data.decode('utf-8')
+
+                        # Fetch image data
+                        unique_images = set()
+                        for doc, doc_i, doc_meta in batch.as_list():
+                            if doc_meta.get("grid_filenames"):
+                                unique_images.update(doc_meta["grid_filenames"].split('|'))
+                        images = [image_file_to_base64(img) for img in list(unique_images)]
+                    else:
+                        images = []
+
+                    batch_summary = await call_token_safe(
+                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error summarizing batch {batch._batch_index}: {e}"
+                )
+                batch_summary = "."
+            self.metrics.summary_tokens += cb.total_tokens
+            self.metrics.summary_requests += cb.successful_requests
+            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
+            logger.info(
+                "Total Tokens: %s, "
+                "Prompt Tokens: %s, "
+                "Completion Tokens: %s, "
+                "Successful Requests: %s, "
+                "Total Cost (USD): $%s"
+                % (
+                    cb.total_tokens,
+                    cb.prompt_tokens,
+                    cb.completion_tokens,
+                    cb.successful_requests,
+                    cb.total_cost,
+                ),
+            )
+        try:
+            # Get metadata from the last document in the batch
+            batch_list = batch.as_list()
+            last_doc_meta = batch_list[-1][2] if batch_list else {}
+            batch_meta = {
+                **last_doc_meta,
+                "batch_i": batch._batch_index,
+                "doc_type": "caption_summary",
+            }
+
+            # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
+            # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
+            self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
+        except Exception as e:
+            logger.error(e)
+
     async def acall(self, state: dict):
         """batch summarization function call
 
@@ -152,32 +234,52 @@ class BatchSummarization(Function):
             if target_end_batch_index == -1:
                 logger.info(f"Current batch index: {self.curr_batch_i}")
                 target_end_batch_index = self.curr_batch_i
-            while time.time() < stop_time:
-                batches = await self.vector_db.aget_text_data(
-                    fields=["text", "batch_i"],
-                    filter=f"doc_type == 'caption_summary' and "
-                    f"{target_start_batch_index}<=batch_i<={target_end_batch_index}",
-                )
-                # Sort batches by batch_i field
-                batches.sort(key=lambda x: x["batch_i"])
-                logger.debug(f"Batches Fetched: {batches}")
-                logger.info(f"Number of Batches Fetched: {len(batches)}")
 
-                # Need ceiling of results/batch_size for correct batch size target end
-                if (
-                    len(batches)
-                    == target_end_batch_index - target_start_batch_index + 1
+            # Track fetched batch indices
+            fetched_batch_indices = set()
+            while time.time() < stop_time:
+                # Only query for unfetched batches
+                unfetched_indices = [
+                    i
+                    for i in range(target_start_batch_index, target_end_batch_index + 1)
+                    if i not in fetched_batch_indices
+                ]
+                if not unfetched_indices:
+                    break
+
+                # Query only for new batches
+                batch_filter = f"doc_type == 'caption_summary' and batch_i in [{','.join(map(str, unfetched_indices))}]"
+                new_batches = await self.vector_db.aget_text_data(
+                    fields=["text", "batch_i"], filter=batch_filter
+                )
+
+                # Update fetched indices and add to results
+                for batch in new_batches:
+                    fetched_batch_indices.add(batch["batch_i"])
+                batches.extend(new_batches)
+
+                # If we have all required batches, break
+                if len(fetched_batch_indices) == (
+                    target_end_batch_index - target_start_batch_index + 1
                 ):
                     logger.info(
-                        f"Need {target_end_batch_index - target_start_batch_index + 1} batches. Moving forward."
+                        f"All {len(fetched_batch_indices)} batches fetched. Moving forward."
                     )
                     break
                 else:
-                    logger.info(
-                        f"Need {target_end_batch_index - target_start_batch_index + 1} batches. Waiting ..."
+                    remaining = (
+                        target_end_batch_index
+                        - target_start_batch_index
+                        + 1
+                        - len(fetched_batch_indices)
                     )
+                    logger.info(f"Need {remaining} more batches. Waiting...")
                     await asyncio.sleep(1)
                     continue
+
+            # Sort batches by batch_i field
+            batches.sort(key=lambda x: x["batch_i"])
+            logger.info(f"Number of Batches Fetched: {len(batches)}")
 
             if len(batches) == 0:
                 state["result"] = ""
@@ -186,123 +288,10 @@ class BatchSummarization(Function):
             elif len(batches) > 0:
                 with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
                     with self._get_appropriate_callback() as cb:
-
-                        async def aggregate_token_safe(batch, retries_left):
-                            try:
-                                with TimeMeasure("OffBatSumm/AggPipeline", "blue"):
-                                    #logger.info(f"aggregation_pipeline batch = {batch}")
-                                    results = await self.aggregation_pipeline.ainvoke(
-                                        batch
-                                    )
-                                    #logger.info(f"aggregation_pipeline results = {results}")
-                                    return results
-                            except Exception as e:
-                                if "400" not in str(e):
-                                    raise e
-                                logger.warning(
-                                    f"Received 400 error from LLM endpoint {e}. "
-                                    "If this is token length exceeded, resolving now..."
-                                )
-
-                                if retries_left <= 0:
-                                    logger.debug(
-                                        "Maximum recursion depth exceeded. Returning batch as is."
-                                    )
-                                    return batch
-
-                                if len(batch) == 1:
-                                    with TimeMeasure("OffBatSumm/BaseCase", "yellow"):
-                                        logger.debug("Base Case, batch size = 1")
-                                        text = batch[0]
-                                        text_splitter = RecursiveCharacterTextSplitter(
-                                            chunk_size=len(text) // 2,
-                                            chunk_overlap=50,
-                                            length_function=len,
-                                            is_separator_regex=False,
-                                        )
-
-                                        chunks = text_splitter.split_text(text)
-                                        first_half, second_half = chunks[0], chunks[1]
-
-                                        logger.debug(
-                                            f"Text exceeds token length. Splitting into "
-                                            f"two parts of lengths {len(first_half)} and {len(second_half)}."
-                                        )
-
-                                        tasks = [
-                                            aggregate_token_safe(
-                                                [first_half], retries_left - 1
-                                            ),
-                                            aggregate_token_safe(
-                                                [second_half], retries_left - 1
-                                            ),
-                                        ]
-                                        summaries = await asyncio.gather(*tasks)
-                                        combined_summary = "\n".join(summaries)
-
-                                        try:
-                                            #logger.info(f"aggregation_pipeline combined_summary = {combined_summary}")
-
-                                            aggregated = (
-                                                await self.aggregation_pipeline.ainvoke(
-                                                    [combined_summary]
-                                                )
-                                            )
-                                            return aggregated
-                                        except Exception:
-                                            logger.debug(
-                                                "Error after combining summaries, retrying with combined summary."
-                                            )
-                                            return await aggregate_token_safe(
-                                                [combined_summary], retries_left - 1
-                                            )
-                                else:
-                                    midpoint = len(batch) // 2
-                                    first_batch = batch[:midpoint]
-                                    second_batch = batch[midpoint:]
-
-                                    logger.debug(
-                                        f"Batch size {len(batch)} exceeds token length. "
-                                        f"Splitting into two batches of sizes {len(first_batch)} and {len(second_batch)}."
-                                    )
-
-                                    tasks = [
-                                        aggregate_token_safe(
-                                            first_batch, retries_left - 1
-                                        ),
-                                        aggregate_token_safe(
-                                            second_batch, retries_left - 1
-                                        ),
-                                    ]
-                                    results = await asyncio.gather(*tasks)
-
-                                    combined_results = []
-                                    for result in results:
-                                        if isinstance(result, list):
-                                            combined_results.extend(result)
-                                        else:
-                                            combined_results.append(result)
-
-                                    try:
-                                        with TimeMeasure(
-                                            "OffBatSumm/CombindAgg", "red"
-                                        ):
-                                            aggregated = (
-                                                await self.aggregation_pipeline.ainvoke(
-                                                    combined_results
-                                                )
-                                            )
-                                            return aggregated
-                                    except Exception:
-                                        logger.debug(
-                                            "Error after combining batch summaries, retrying with combined summaries."
-                                        )
-                                        return await aggregate_token_safe(
-                                            combined_results, retries_left - 1
-                                        )
-
-                        result = await aggregate_token_safe(
-                            batches, self.recursion_limit
+                        result = await call_token_safe(
+                            batches,
+                            self.aggregation_pipeline,
+                            self.recursion_limit,
                         )
                         state["result"] = result
                     logger.info("Summary Aggregation Done")
@@ -376,81 +365,12 @@ class BatchSummarization(Function):
 
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)
                 if batch.is_full():
-                    with TimeMeasure(
-                        "Batch "
-                        + str(self.batcher.get_batch_index(doc_i))
-                        + " Summary IS LAST "
-                        + str(doc_meta["is_last"]),
-                        "pink",
-                    ):
-                        logger.info(
-                            "Batch %d is full. Processing ...", batch._batch_index
-                        )
-                        try:
-                            with self._get_appropriate_callback() as cb:
-                                if self.endless_ai_enabled:
-                                    def image_file_to_base64(filepath):
-                                        # Open the image file in binary mode
-                                        with open(filepath, 'rb') as image_file:
-                                            image_data = image_file.read()
+                    # Process the batch immediately when full
+                    await asyncio.create_task(self._process_full_batch(batch))
 
-                                        # Encode the binary data to base64
-                                        base64_data = base64.b64encode(image_data)
-
-                                        # Convert bytes to a string (optional)
-                                        return base64_data.decode('utf-8')
-
-                                    # Fetch image data
-                                    unique_images = set()
-                                    for doc, doc_i, doc_meta in batch.as_list():
-                                        if doc_meta.get("grid_filenames"):
-                                            unique_images.update(doc_meta["grid_filenames"].split('|'))
-                                    images = [image_file_to_base64(img) for img in list(unique_images)]
-                                else:
-                                    images = []
-
-                                batch_summary = await self.batch_pipeline.ainvoke(
-                                    {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}
-                                )
-                        except Exception as e:
-                            logger.error(
-                                f"Error summarizing batch {batch._batch_index}: {e}"
-                            )
-                            batch_summary = "."
-                        self.metrics.summary_tokens += cb.total_tokens
-                        self.metrics.summary_requests += cb.successful_requests
-                        logger.info(
-                            "Batch %d summary: %s", batch._batch_index, batch_summary
-                        )
-                        logger.info(
-                            "Total Tokens: %s, "
-                            "Prompt Tokens: %s, "
-                            "Completion Tokens: %s, "
-                            "Successful Requests: %s, "
-                            "Total Cost (USD): $%s"
-                            % (
-                                cb.total_tokens,
-                                cb.prompt_tokens,
-                                cb.completion_tokens,
-                                cb.successful_requests,
-                                cb.total_cost,
-                            ),
-                        )
-                    try:
-                        batch_meta = {
-                            **doc_meta,
-                            "batch_i": batch._batch_index,
-                            "doc_type": "caption_summary",
-                        }
-                        # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
-                        # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
-                        self.vector_db.add_summary(
-                            summary=batch_summary, metadata=batch_meta
-                        )
-                    except Exception as e:
-                        logger.error(e)
             if self.summary_start_time is None:
                 self.summary_start_time = bs.start_time
+
             self.metrics.summary_latency = bs.end_time - self.summary_start_time
         except Exception as e:
             logger.error(e)
