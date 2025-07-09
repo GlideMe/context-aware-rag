@@ -145,6 +145,8 @@ class GraphExtraction:
 
             async def semaphore_controlled_embed(content):
                 async with self._embedding_semaphore:
+                    active_requests = 250 - self._embedding_semaphore._value
+                    logger.info(f"CHUNK EMBED DEBUG: Active requests: {active_requests}/250")
                     return await self.graph_db.embeddings.aembed_query(content)
 
             tasks = [
@@ -485,6 +487,8 @@ class GraphExtraction:
 
             async def semaphore_controlled_embed(text):
                 async with self._embedding_semaphore:
+                    active_requests = 250 - self._embedding_semaphore._value
+                    logger.info(f"ENTITY EMBED DEBUG: Active requests: {active_requests}/250")
                     return await self.graph_db.embeddings.aembed_query(text)
 
             tasks = [
@@ -500,7 +504,7 @@ class GraphExtraction:
             CALL db.create.setNodeVectorProperty(e, "embedding", row.embedding)
             """
             return self.graph_db.graph_db.query(query, params={"rows": rows})
-            
+
     def create_chunk_vector_index(self):
         try:
             vector_index = self.graph_db.graph_db.query(
