@@ -78,7 +78,10 @@ class GraphRetrieval:
         self.chat_history_summarization_chain = summarization_prompt | llm
 
         def prepare_messages(inputs):
-            messages = [SystemMessage(content=CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE)]
+            context = inputs.get("context", "")
+            template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
+            system_content = template.format(context=context)
+            messages = [SystemMessage(content=system_content)]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
