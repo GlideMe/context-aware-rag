@@ -43,6 +43,7 @@ class BatchSummarization(Function):
     """Batch Summarization Function"""
 
     config: dict
+    batch_prompt: str
     aggregation_prompt: str
     output_parser = StrOutputParser()
     batch_size: int

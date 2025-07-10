@@ -460,28 +460,49 @@ class GraphExtraction:
         logger.debug(f"Embedding parallel count: {self.embedding_parallel_count}")
         with TimeMeasure("GraphExtraction/FetchEntEmbd", "green"):
             rows = self.fetch_entities_for_embedding()
+        #logger.info(f"DEBUG: Total entities to embed: {len(rows)}")
+        #logger.info(f"DEBUG: First 5 entities: {[row['text'][:50] for row in rows[:5]]}")
+        #logger.info(f"DEBUG: Batch size: {self.embedding_parallel_count}")
+        #logger.info(f"DEBUG: Number of batches: {len(rows) // self.embedding_parallel_count + 1}")
         for i in range(0, len(rows), self.embedding_parallel_count):
             await self.update_embeddings(rows[i : i + self.embedding_parallel_count])
 
     def fetch_entities_for_embedding(self):
         query = """
                 MATCH (e)
-                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL
+                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL AND e.uuid = $uuid
                 RETURN elementId(e) AS elementId, e.id + " " + coalesce(e.description, "") AS text
                 """
-        result = self.graph_db.graph_db.query(query)
+        result = self.graph_db.graph_db.query(query, {"uuid": self.uuid})
         return [
             {"elementId": record["elementId"], "text": record["text"]}
             for record in result
         ]
-
+    
     async def update_embeddings(self, rows):
         with TimeMeasure("GraphExtraction/UpdatEmbding", "yellow"):
             logger.info("update embedding for entities")
 
             async def semaphore_controlled_embed(text):
                 async with self._embedding_semaphore:
-                    return await self.graph_db.embeddings.aembed_query(text)
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            return await self.graph_db.embeddings.aembed_query(text)
+                        except Exception as e:
+                            if "429" in str(e) or "Too Many Requests" in str(e):
+                                if attempt < max_retries - 1:
+                                    delay = 2 ** attempt  # 1s, 2s, 4s delays
+                                    logger.warning(f"Rate limit hit, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                                    await asyncio.sleep(delay)
+                                    continue
+                                else:
+                                    logger.error(f"All {max_retries} retries failed for rate limiting")
+                                    raise
+                            else:
+                                # Non-rate-limit error, don't retry
+                                raise
+                    
 
             tasks = [
                 asyncio.create_task(semaphore_controlled_embed(row["text"]))
