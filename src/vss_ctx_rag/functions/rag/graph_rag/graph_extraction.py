@@ -481,7 +481,23 @@ class GraphExtraction:
 
             async def semaphore_controlled_embed(text):
                 async with self._embedding_semaphore:
-                    return await self.graph_db.embeddings.aembed_query(text)
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            return await self.graph_db.embeddings.aembed_query(text)
+                        except Exception as e:
+                            if "429" in str(e) or "Too Many Requests" in str(e):
+                                if attempt < max_retries - 1:
+                                    delay = 2 ** attempt  # 1s, 2s, 4s delays
+                                    logger.warning(f"GRAPH DB RATE LIMIT HIT, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                                    await asyncio.sleep(delay)
+                                    continue
+                                else:
+                                    logger.error(f"GRAPH DB RATE LIMIT HIT, All {max_retries} retries failed for rate limiting")
+                                    raise
+                            else:
+                                # Non-rate-limit error, don't retry
+                                raise
 
             tasks = [
                 asyncio.create_task(semaphore_controlled_embed(row["text"]))
