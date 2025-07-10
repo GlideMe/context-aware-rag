@@ -214,39 +214,44 @@ class ClaudeBedrockLLM(BaseChatModel):
         return body
     
     def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
-        """Generate a single response using Bedrock"""
-        try:
-            # Format messages for Claude
-            body = self._format_messages_for_claude(messages)
-            #This log is the entire body of message ssent to claude. it is very large 
-            #so only use when needed.
-            #logger.info(f"Claude request body: {json.dumps(body, indent=2)}")
-            # Call Bedrock
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(body),
-                contentType='application/json'
-            )
-            
-            # Parse response
-            response_body = json.loads(response['body'].read())
-            content_list = response_body.get('content', [])
-            if content_list:  # Check if list has elements
-                content = content_list[0].get('text', '')
-            else:
-                content = ''  # Handle empty list safely
-            
-            # Create ChatGeneration
-            generation = ChatGeneration(message=AIMessage(content=content))
-            
-            return ChatResult(generations=[generation])
-            
-        except (BotoCoreError, ClientError) as e:
-            logger.error(f"AWS Bedrock error: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error calling Claude: {e}")
-            raise
+        """Generate a single response using Bedrock with simple retry logic"""
+        
+        # Format messages for Claude
+        body = self._format_messages_for_claude(messages)
+        
+        # Simple retry loop - try 3 times with increasing delays
+        for attempt in range(3):
+            try:
+                # Call Bedrock
+                response = self.bedrock_client.invoke_model(
+                    modelId=self.model_id,
+                    body=json.dumps(body),
+                    contentType='application/json'
+                )
+                
+                # Parse response
+                response_body = json.loads(response['body'].read())
+                content_list = response_body.get('content', [])
+                if content_list:
+                    content = content_list[0].get('text', '')
+                else:
+                    content = ''
+                
+                # Create ChatGeneration
+                generation = ChatGeneration(message=AIMessage(content=content))
+                return ChatResult(generations=[generation])
+                
+            except (BotoCoreError, ClientError) as e:
+                if "ThrottlingException" in str(e) and attempt < 2:
+                    delay = (attempt + 1) * 2  # 2, 4 seconds
+                    logger.warning(f"Claude throttled, retrying in {delay}s...")
+                    time.sleep(delay)
+                else:
+                    logger.error(f"AWS Bedrock error: {e}")
+                    raise
+            except Exception as e:
+                logger.error(f"Unexpected error calling Claude: {e}")
+                raise
     
     def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
         """Stream response from Bedrock (simplified - yields single response)"""
