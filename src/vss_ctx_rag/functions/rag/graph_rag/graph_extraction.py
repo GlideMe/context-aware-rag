@@ -460,21 +460,25 @@ class GraphExtraction:
         logger.debug(f"Embedding parallel count: {self.embedding_parallel_count}")
         with TimeMeasure("GraphExtraction/FetchEntEmbd", "green"):
             rows = self.fetch_entities_for_embedding()
+        #logger.info(f"DEBUG: Total entities to embed: {len(rows)}")
+        #logger.info(f"DEBUG: First 5 entities: {[row['text'][:50] for row in rows[:5]]}")
+        #logger.info(f"DEBUG: Batch size: {self.embedding_parallel_count}")
+        #logger.info(f"DEBUG: Number of batches: {len(rows) // self.embedding_parallel_count + 1}")
         for i in range(0, len(rows), self.embedding_parallel_count):
             await self.update_embeddings(rows[i : i + self.embedding_parallel_count])
 
     def fetch_entities_for_embedding(self):
         query = """
                 MATCH (e)
-                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL
+                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL AND e.uuid = $uuid
                 RETURN elementId(e) AS elementId, e.id + " " + coalesce(e.description, "") AS text
                 """
-        result = self.graph_db.graph_db.query(query)
+        result = self.graph_db.graph_db.query(query, {"uuid": self.uuid})
         return [
             {"elementId": record["elementId"], "text": record["text"]}
             for record in result
         ]
-
+    
     async def update_embeddings(self, rows):
         with TimeMeasure("GraphExtraction/UpdatEmbding", "yellow"):
             logger.info("update embedding for entities")
