@@ -91,7 +91,7 @@ class BatchSummarization(Function):
                 user_prompt_text_char_count += sum(
                     len(block["image_url"].get("data", "")) for block in content_blocks if block["type"] == "image_url"
                 )
-            logger.info(f"prepare_messages: User prompt length: {len(user_prompt_text_char_count)} characters")
+            logger.info(f"prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
             logger.info(f"prepare_messages: System prompt length: {len(system_prompt)} characters")
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
