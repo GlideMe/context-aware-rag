@@ -163,9 +163,7 @@ class BatchSummarization(Function):
             ),
             "pink",
         ):
-            logger.info(
-                "Batch %d is full. Processing ...", batch._batch_index
-            )
+            logger.info("Batch %d is full. Processing ...", batch._batch_index)
             try:
                 with self._get_appropriate_callback() as cb:
                     if self.endless_ai_enabled:
@@ -186,7 +184,8 @@ class BatchSummarization(Function):
                             if doc_meta.get("grid_filenames"):
                                 unique_images.update(doc_meta["grid_filenames"].split('|'))
                         images = [image_file_to_base64(img) for img in list(unique_images)]
-                        logger.info("DEBUG: _process_full_batch: Unique image files:\n%s", '\n'.join(unique_images))
+                        for filename in unique_images:
+                            logger.info("DEBUG: Added Image file: %s for batch index %d", filename, batch._batch_index)
                     else:
                         images = []
 
@@ -194,9 +193,7 @@ class BatchSummarization(Function):
                         {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
             except Exception as e:
-                logger.error(
-                    f"Error summarizing batch {batch._batch_index}: {e}"
-                )
+                logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
                 batch_summary = "."
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
