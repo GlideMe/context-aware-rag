@@ -80,11 +80,21 @@ class BatchSummarization(Function):
                     ]
 
             system_prompt = self.get_param("prompts", "caption_summarization")
-            user_prompt = content_blocks
+            user_prompt_text_char_count = sum(
+                len(block["text"]) for block in content_blocks if block["type"] == "text"
+            )
+            if is_claude_model(model_name):
+                user_prompt_text_char_count += sum(
+                    len(block["source"].get("data", "")) for block in content_blocks if block["type"] == "image"
+                )
+            else:
+                user_prompt_text_char_count += sum(
+                    len(block["image_url"].get("data", "")) for block in content_blocks if block["type"] == "image_url"
+                )
+            logger.info(f"prepare_messages: User prompt length: {len(user_prompt_text_char_count)} characters")
             logger.info(f"prepare_messages: System prompt length: {len(system_prompt)} characters")
-            logger.info(f"prepare_messages: User prompt length: {len(user_prompt)} characters")
 
-            return [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+            return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [
