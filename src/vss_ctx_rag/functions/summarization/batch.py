@@ -67,7 +67,7 @@ class BatchSummarization(Function):
             images = inputs.get("images", [])
             if images:
                 content_blocks += [
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
+                    {"type": "image", "source": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
                 ]
 
             return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]

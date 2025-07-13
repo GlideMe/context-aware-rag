@@ -80,7 +80,7 @@ class GraphRetrieval:
         def prepare_messages(inputs):
             context = inputs.get("context", "")
             template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
-            system_content = template.format(context=context)
+            system_content = template.format(context=context) if self.endless_ai_enabled else template
             messages = [SystemMessage(content=system_content)]
 
             for msg in inputs["messages"]:
