@@ -60,7 +60,6 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
-            logger.info(f"ELAD1: {inputs}")
             # start with the user text
             content_blocks = [{"type": "text", "text": inputs["input"]}]
 
