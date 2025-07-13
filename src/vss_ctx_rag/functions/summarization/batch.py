@@ -69,7 +69,7 @@ class BatchSummarization(Function):
             llm_tool = self.get_tool(LLM_TOOL_NAME)
             model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
             if images:
-                logger.info(f"prepare_messages: Found {len(images)} images in the input.")
+                logger.info(f"DEBUG: prepare_messages: Found {len(images)} images in the input.")
                 if is_claude_model(model_name):
                     content_blocks += [
                         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images
@@ -91,8 +91,8 @@ class BatchSummarization(Function):
                 user_prompt_text_char_count += sum(
                     len(block["image_url"].get("data", "")) for block in content_blocks if block["type"] == "image_url"
                 )
-            logger.info(f"prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
-            logger.info(f"prepare_messages: System prompt length: {len(system_prompt)} characters")
+            logger.info(f"DEBUG: prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
+            logger.info(f"DEBUG: prepare_messages: System prompt length: {len(system_prompt)} characters")
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
@@ -186,6 +186,7 @@ class BatchSummarization(Function):
                             if doc_meta.get("grid_filenames"):
                                 unique_images.update(doc_meta["grid_filenames"].split('|'))
                         images = [image_file_to_base64(img) for img in list(unique_images)]
+                        logger.info("DEBUG: _process_full_batch: Unique image files:\n%s", '\n'.join(unique_images))
                     else:
                         images = []
 
