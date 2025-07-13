@@ -69,6 +69,7 @@ class BatchSummarization(Function):
             llm_tool = self.get_tool(LLM_TOOL_NAME)
             model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
             if images:
+                logger.info(f"prepare_messages: Found {len(images)} images in the input.")
                 if is_claude_model(model_name):
                     content_blocks += [
                         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images
@@ -77,8 +78,13 @@ class BatchSummarization(Function):
                     content_blocks += [
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
                     ]
-                    
-            return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
+
+            system_prompt = self.get_param("prompts", "caption_summarization")
+            user_prompt = content_blocks
+            logger.info(f"prepare_messages: System prompt length: {len(system_prompt)} characters")
+            logger.info(f"prepare_messages: User prompt length: {len(user_prompt)} characters")
+
+            return [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
 
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [
