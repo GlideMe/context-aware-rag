@@ -136,14 +136,13 @@ class GeminiOptimizer:
                     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                 }
-                
+
                 # Generate response
                 start_time = time.time()
                 if len(formatted_messages) == 1:
                     logger.info(f"GEMINI LLM SAFETY DEBUG: Safety settings being sent:")
                     for category, threshold in safety_settings.items():
                         logger.info(f"GEMINI LLM SAFETY DEBUG: {category.name} = {threshold.name}")
-
                     # Single message
                     response = model.generate_content(
                         formatted_messages[0]["parts"][0],
@@ -153,10 +152,17 @@ class GeminiOptimizer:
                     # ADD THESE LOGS RIGHT AFTER the model.generate_content() calls:
                     logger.info(f"GEMINI LLM SAFETY DEBUG: Response finish_reason = {getattr(response, 'finish_reason', 'N/A')}")
                     if hasattr(response, 'candidates') and response.candidates:
-                        candidate = response.candidates[0]  
+                        candidate = response.candidates[0]  # <- ADD THIS LINE
                         logger.info(f"GEMINI LLM SAFETY DEBUG: Candidate finish_reason = {getattr(candidate, 'finish_reason', 'N/A')}")
                         if hasattr(candidate, 'safety_ratings'):
                             logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings = {candidate.safety_ratings}")
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings type = {type(candidate.safety_ratings)}")
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings length = {len(candidate.safety_ratings) if candidate.safety_ratings else 'None'}")
+                            if candidate.safety_ratings:
+                                for i, rating in enumerate(candidate.safety_ratings):
+                                    logger.info(f"GEMINI LLM SAFETY DEBUG: Rating {i}: {rating}")
+                        else:
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: No safety_ratings attribute found")
                 else:
                     # Multi-turn conversation
                     logger.info(f"GEMINI LLM SAFETY DEBUG: Safety settings being sent (multi-turn):")
@@ -174,6 +180,14 @@ class GeminiOptimizer:
                         logger.info(f"GEMINI LLM SAFETY DEBUG: Candidate finish_reason = {getattr(candidate, 'finish_reason', 'N/A')}")
                         if hasattr(candidate, 'safety_ratings'):
                             logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings = {candidate.safety_ratings}")
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings type = {type(candidate.safety_ratings)}")
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings length = {len(candidate.safety_ratings) if candidate.safety_ratings else 'None'}")
+                            if candidate.safety_ratings:
+                                for i, rating in enumerate(candidate.safety_ratings):
+                                    logger.info(f"GEMINI LLM SAFETY DEBUG: Rating {i}: {rating}")
+                        else:
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: No safety_ratings attribute found")
+
                 
                 # Extract response (handle safety filters)
                 try:
