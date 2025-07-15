@@ -60,8 +60,12 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
+            logger.info(f"ELAD3: {inputs["input"]}")
             # start with the user text
-            content_blocks = [{"type": "text", "text": inputs["input"]}]
+            if inputs["input"]:
+                content_blocks = [{"type": "text", "text": inputs["input"]}]
+            else:
+                content_blocks = []
 
             # Add image blocks if any are present
             images = inputs.get("images", [])
@@ -183,14 +187,19 @@ class BatchSummarization(Function):
                         for doc, doc_i, doc_meta in batch.as_list():
                             if doc_meta.get("grid_filenames"):
                                 unique_images.update(doc_meta["grid_filenames"].split('|'))
+
+                        logger.info(f"ELAD1: unique_images = {unique_images}")
+
                         images = [image_file_to_base64(img) for img in list(unique_images)]
                         for filename in unique_images:
                             logger.info("DEBUG: Added Image file: %s for batch index %d", filename, batch._batch_index)
                     else:
                         images = []
+                    a = " ".join([doc for doc, _, _ in batch.as_list()])
+                    logger.info(f"ELAD2: input = {a}")
 
                     batch_summary = await call_token_safe(
-                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                        {"input": a, "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
             except Exception as e:
                 logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
