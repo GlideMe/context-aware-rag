@@ -140,20 +140,40 @@ class GeminiOptimizer:
                 # Generate response
                 start_time = time.time()
                 if len(formatted_messages) == 1:
+                    logger.info(f"GEMINI LLM SAFETY DEBUG: Safety settings being sent:")
+                    for category, threshold in safety_settings.items():
+                        logger.info(f"GEMINI LLM SAFETY DEBUG: {category.name} = {threshold.name}")
+
                     # Single message
                     response = model.generate_content(
                         formatted_messages[0]["parts"][0],
                         generation_config=generation_config,
                         safety_settings=safety_settings
                     )
+                    # ADD THESE LOGS RIGHT AFTER the model.generate_content() calls:
+                    logger.info(f"GEMINI LLM SAFETY DEBUG: Response finish_reason = {getattr(response, 'finish_reason', 'N/A')}")
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]  
+                        logger.info(f"GEMINI LLM SAFETY DEBUG: Candidate finish_reason = {getattr(candidate, 'finish_reason', 'N/A')}")
+                        if hasattr(candidate, 'safety_ratings'):
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings = {candidate.safety_ratings}")
                 else:
                     # Multi-turn conversation
+                    logger.info(f"GEMINI LLM SAFETY DEBUG: Safety settings being sent (multi-turn):")
+                    for category, threshold in safety_settings.items():
+                        logger.info(f"GEMINI LLM SAFETY DEBUG: {category.name} = {threshold.name}")
                     chat = model.start_chat(history=formatted_messages[:-1])
                     response = chat.send_message(
                         formatted_messages[-1]["parts"][0],
                         generation_config=generation_config,
                         safety_settings=safety_settings
                     )
+                    logger.info(f"GEMINI LLM SAFETY DEBUG: Response finish_reason = {getattr(response, 'finish_reason', 'N/A')}")
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]  
+                        logger.info(f"GEMINI LLM SAFETY DEBUG: Candidate finish_reason = {getattr(candidate, 'finish_reason', 'N/A')}")
+                        if hasattr(candidate, 'safety_ratings'):
+                            logger.info(f"GEMINI LLM SAFETY DEBUG: Safety ratings = {candidate.safety_ratings}")
                 
                 # Extract response (handle safety filters)
                 try:
