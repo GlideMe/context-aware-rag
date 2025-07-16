@@ -140,9 +140,25 @@ class GeminiOptimizer:
                 # Generate response
                 start_time = time.time()
                 if len(formatted_messages) == 1:
-                    logger.info(f"GEMINI LLM SAFETY DEBUG: Safety settings being sent:")
-                    for category, threshold in safety_settings.items():
-                        logger.info(f"GEMINI LLM SAFETY DEBUG: {category.name} = {threshold.name}")
+                    logger.info(f"GEMINI BATCH DEBUG: Number of messages being sent: {len(formatted_messages)}")
+                    if len(formatted_messages) == 1:
+                        # Single message case
+                        content = formatted_messages[0]["parts"][0]
+                        logger.info(f"GEMINI BATCH DEBUG: Single message content length: {len(content)} characters")
+                        logger.info(f"GEMINI BATCH DEBUG: Content preview: {content[:200]}...")
+                        logger.info(f"GEMINI BATCH DEBUG: Estimated tokens (rough): {len(content) // 4}")
+                    else:
+                        # Multi-turn case
+                        total_length = 0
+                        for i, msg in enumerate(formatted_messages):
+                            content = msg["parts"][0]
+                            total_length += len(content)
+                            logger.info(f"GEMINI BATCH DEBUG: Message {i+1} ({msg['role']}): {len(content)} characters")
+                        logger.info(f"GEMINI BATCH DEBUG: Total conversation length: {total_length} characters")
+                        logger.info(f"GEMINI BATCH DEBUG: Estimated tokens (rough): {total_length // 4}")
+
+                    logger.info(f"GEMINI BATCH DEBUG: max_output_tokens setting: {max_tokens}")
+                    logger.info(f"GEMINI BATCH DEBUG: temperature: {temperature}, top_p: {top_p}")
                     # Single message
                     response = model.generate_content(
                         formatted_messages[0]["parts"][0],

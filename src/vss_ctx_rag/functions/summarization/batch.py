@@ -165,6 +165,15 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
+                    batch_list = batch.as_list()
+                    logger.info(f"CA-RAG BATCH DEBUG: Processing batch {batch._batch_index}")
+                    logger.info(f"CA-RAG BATCH DEBUG: Batch size: {len(batch_list)} documents")
+                    total_text = " ".join([doc for doc, _, _ in batch_list])
+                    logger.info(f"CA-RAG BATCH DEBUG: Total text length: {len(total_text)} characters")
+                    logger.info(f"CA-RAG BATCH DEBUG: Number of images: {len(images)}")
+                    logger.info(f"CA-RAG BATCH DEBUG: Text preview: {total_text[:300]}...")
+                    for i, (doc, doc_i, doc_meta) in enumerate(batch_list):
+                        logger.info(f"CA-RAG BATCH DEBUG: Doc {i+1}: {len(doc)} chars, doc_i={doc_i}")
                     batch_summary = await call_token_safe(
                         {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
