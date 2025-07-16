@@ -72,7 +72,7 @@ class BatchSummarization(Function):
             llm_tool = self.get_tool(LLM_TOOL_NAME)
             model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
             if images:
-                logger.info(f"DEBUG: prepare_messages: Found {len(images)} images in the input.")
+                logger.debug(f"DEBUG: prepare_messages: Found {len(images)} images in the input.")
                 if is_claude_model(model_name):
                     content_blocks += [
                         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images
@@ -94,8 +94,8 @@ class BatchSummarization(Function):
                 user_prompt_text_char_count += sum(
                     len(block["image_url"].get("data", "")) for block in content_blocks if block["type"] == "image_url"
                 )
-            logger.info(f"DEBUG: prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
-            logger.info(f"DEBUG: prepare_messages: System prompt length: {len(system_prompt)} characters")
+            logger.debug(f"DEBUG: prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
+            logger.debug(f"DEBUG: prepare_messages: System prompt length: {len(system_prompt)} characters")
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
@@ -189,13 +189,12 @@ class BatchSummarization(Function):
 
                         images = [image_file_to_base64(img) for img in list(unique_images)]
                         for filename in unique_images:
-                            logger.info("DEBUG: Added Image file: %s for batch index %d", filename, batch._batch_index)
+                            logger.debug("DEBUG: Added Image file: %s for batch index %d", filename, batch._batch_index)
                     else:
                         images = []
-                    a = " ".join([doc for doc, _, _ in batch.as_list()])
-                    
+                        
                     batch_summary = await call_token_safe(
-                        {"input": a, "images": images}, self.batch_pipeline, self.recursion_limit,
+                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
             except Exception as e:
                 logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
