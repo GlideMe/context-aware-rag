@@ -39,7 +39,7 @@ from vss_ctx_rag.utils.globals import (
     DEFAULT_EMBEDDING_PARALLEL_COUNT,
 )
 from vss_ctx_rag.functions.rag.graph_rag.constants import QUERY_TO_DELETE_UUID_GRAPH
-from vss_ctx_rag.utils.utils import is_claude_model
+from vss_ctx_rag.utils.common_utils import is_claude_model
 
 
 class GraphExtractionFunc(Function):

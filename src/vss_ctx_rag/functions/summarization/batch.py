@@ -25,7 +25,8 @@ from schema import Schema
 import base64
 
 from vss_ctx_rag.base import Function
-from vss_ctx_rag.utils.utils import remove_think_tags, is_claude_model
+from vss_ctx_rag.utils.utils import remove_think_tags, call_token_safe
+from vss_ctx_rag.utils.common_utils import is_claude_model
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
@@ -36,7 +37,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from vss_ctx_rag.utils.utils import call_token_safe
 
 
 class BatchSummarization(Function):

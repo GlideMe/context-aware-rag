@@ -62,8 +62,7 @@ from vss_ctx_rag.functions.rag.vector_rag.vector_retrieval_func import (
 from vss_ctx_rag.utils.utils import RequestInfo
 from vss_ctx_rag.utils.globals import DEFAULT_CONCURRENT_DOC_PROCESSING_LIMIT
 
-from vss_ctx_rag.utils.utils import (
-    RequestInfo,
+from vss_ctx_rag.utils.common_utils import (
     is_openai_model,
     is_claude_model,
 )
