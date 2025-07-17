@@ -61,10 +61,7 @@ class BatchSummarization(Function):
     def setup(self):
         def prepare_messages(inputs):
             # start with the user text
-            if inputs["input"]:
-                content_blocks = [{"type": "text", "text": inputs["input"]}]
-            else:
-                content_blocks = []
+            content_blocks = [{"type": "text", "text": inputs["input"]}]
 
             # Add image blocks if any are present
             images = inputs.get("images", [])
@@ -86,16 +83,6 @@ class BatchSummarization(Function):
             user_prompt_text_char_count = sum(
                 len(block["text"]) for block in content_blocks if block["type"] == "text"
             )
-            if is_claude_model(model_name):
-                user_prompt_text_char_count += sum(
-                    len(block["source"].get("data", "")) for block in content_blocks if block["type"] == "image"
-                )
-            else:
-                user_prompt_text_char_count += sum(
-                    len(block["image_url"].get("data", "")) for block in content_blocks if block["type"] == "image_url"
-                )
-            logger.debug(f"DEBUG: prepare_messages: User prompt length: {user_prompt_text_char_count} characters")
-            logger.debug(f"DEBUG: prepare_messages: System prompt length: {len(system_prompt)} characters")
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
