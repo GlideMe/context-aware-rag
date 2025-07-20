@@ -81,19 +81,21 @@ class GraphRetrieval:
             context = inputs.get("context", "")
             template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
             system_content = template.format(context=context)
+            # logger.info(f"SystemMessage={system_content}")
             messages = [SystemMessage(content=system_content)]
 
             for msg in inputs["messages"]:
                 messages.append(msg)
 
-            content_blocks = [{"type": "text", "text": f"User question: {inputs['input']}"}]
-            # Add image blocks if any are present
+            content_blocks = []
             if self.endless_ai_enabled:
+                # Add image blocks if any are present
                 images = inputs.get("images", [])
-                if images:
-                    content_blocks += [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                    ]
+                # logger.info(f"Length of {len(images)} images={sum(len(img) for img in images)}")
+                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+
+            # Add the user question after the images (if any)
+            content_blocks.append({"type": "text", "text": f"User question: {inputs['input']}"})
 
             messages.append(HumanMessage(content=content_blocks))
 
