@@ -117,7 +117,7 @@ class GraphRetrievalFunc(Function):
                             if chunkdetail['grid_filenames']:
                                 unique_images.update(chunkdetail['grid_filenames'].split('|'))
 
-                    # logger.info(f"unique_images={list(unique_images)}")
+                    logger.info(f"^^^ unique_images={list(unique_images)}")
 
                     def image_file_to_base64(filepath):
                         # Open the image file in binary mode

@@ -65,14 +65,12 @@ class BatchSummarization(Function):
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
                 if images:
-                    content_blocks += [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                    ]
+                    content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
                 else:
                     logger.error("^^^^ No images found in inputs for batch summarization.")
 
             # Add the user question after the images (if any)
-            content_blocks += [{"type": "text", "text": f"User question: {inputs['input']}"}]
+            content_blocks.append({"type": "text", "text": inputs["input"]})
 
             return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
 
@@ -169,7 +167,7 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
-                    logger.info(f"^^^^ Total unique images found: {len(unique_images)}")
+                    logger.info(f"^^^ Total unique images found: {len(unique_images)}")
                     logger.info(f"^^^^ Total unique images found: {len(images)}")
                     for img in unique_images:
                         logger.info(f"^^^^ Found Unique image: {img}")
