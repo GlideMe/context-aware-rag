@@ -125,8 +125,7 @@ class GraphExtractionFunc(Function):
                 ):
                     try:
                         # Detect which model we're using
-                        model_name = getattr(self.chat_llm.llm, 'model_id', '') or getattr(self.chat_llm.llm, 'model', '')
-                        
+                        model_name = self.get_param("llm", "model")                        
                         if is_claude_model(model_name):
                             with get_bedrock_anthropic_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)

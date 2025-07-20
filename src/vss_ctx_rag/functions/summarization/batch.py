@@ -67,7 +67,7 @@ class BatchSummarization(Function):
             images = inputs.get("images", [])
 
             llm_tool = self.get_tool(LLM_TOOL_NAME)
-            model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
+            model_name = self.get_param("llm", "model")
             if images:
                 logger.debug(f"DEBUG: prepare_messages: Found {len(images)} images in the input.")
                 if is_claude_model(model_name):
@@ -133,7 +133,7 @@ class BatchSummarization(Function):
         """Get the appropriate callback based on the LLM being used"""
         # Get the LLM from the pipeline
         llm_tool = self.get_tool(LLM_TOOL_NAME)
-        model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
+        model_name = self.get_param("llm", "model")
         
         if is_claude_model(model_name):
             return get_bedrock_anthropic_callback()
