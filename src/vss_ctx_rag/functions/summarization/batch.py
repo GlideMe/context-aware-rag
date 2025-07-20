@@ -60,29 +60,20 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
-            # start with the user text
-            content_blocks = [{"type": "text", "text": inputs["input"]}]
-
-            # Add image blocks if any are present
-            images = inputs.get("images", [])
-
-            llm_tool = self.get_tool(LLM_TOOL_NAME)
-            model_name = self.get_param("llm", "model")
-            if images:
-                logger.debug(f"DEBUG: prepare_messages: Found {len(images)} images in the input.")
-                if is_claude_model(model_name):
-                    content_blocks += [
-                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images
-                    ]
-                else:
-                    content_blocks += [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                    ]
-
             system_prompt = self.get_param("prompts", "caption_summarization")
-            user_prompt_text_char_count = sum(
-                len(block["text"]) for block in content_blocks if block["type"] == "text"
-            )
+
+            content_blocks = []
+            if self.endless_ai_enabled:
+                # Add image blocks if any are present
+                images = inputs.get("images", [])
+                model_name = self.get_param("llm", "model")
+                if is_claude_model(model_name):
+                    content_blocks.extend({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images)
+                else:
+                    content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+
+            # Add the user question after the images (if any)
+            content_blocks.append({"type": "text", "text": inputs["input"]})
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
@@ -131,10 +122,7 @@ class BatchSummarization(Function):
 
     def _get_appropriate_callback(self):
         """Get the appropriate callback based on the LLM being used"""
-        # Get the LLM from the pipeline
-        llm_tool = self.get_tool(LLM_TOOL_NAME)
         model_name = self.get_param("llm", "model")
-        
         if is_claude_model(model_name):
             return get_bedrock_anthropic_callback()
         else:
@@ -153,7 +141,9 @@ class BatchSummarization(Function):
             ),
             "pink",
         ):
-            logger.info("Batch %d is full. Processing ...", batch._batch_index)
+            logger.info(
+                "Batch %d is full. Processing ...", batch._batch_index
+            )
             try:
                 with self._get_appropriate_callback() as cb:
                     if self.endless_ai_enabled:
@@ -173,10 +163,7 @@ class BatchSummarization(Function):
                         for doc, doc_i, doc_meta in batch.as_list():
                             if doc_meta.get("grid_filenames"):
                                 unique_images.update(doc_meta["grid_filenames"].split('|'))
-
                         images = [image_file_to_base64(img) for img in list(unique_images)]
-                        for filename in unique_images:
-                            logger.debug("DEBUG: Added Image file: %s for batch index %d", filename, batch._batch_index)
                     else:
                         images = []
                         
@@ -184,7 +171,9 @@ class BatchSummarization(Function):
                         {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
             except Exception as e:
-                logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
+                logger.error(
+                    f"Error summarizing batch {batch._batch_index}: {e}"
+                )
                 batch_summary = "."
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
