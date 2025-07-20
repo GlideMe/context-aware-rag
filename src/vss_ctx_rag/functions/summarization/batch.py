@@ -60,15 +60,14 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
-            # start with the user text
-            content_blocks = [{"type": "text", "text": inputs["input"]}]
+            content_blocks = []
+            if self.endless_ai_enabled:
+                # Add image blocks if any are present
+                images = inputs.get("images", [])
+                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
-            # Add image blocks if any are present
-            images = inputs.get("images", [])
-            if images:
-                content_blocks += [
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                ]
+            # Add the user question after the images (if any)
+            content_blocks.append({"type": "text", "text": inputs["input"]})
 
             return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
 
@@ -357,7 +356,7 @@ class BatchSummarization(Function):
 
                 # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
-                if self.endless_ai_enabled:
+                if self.endless_ai_enabled and doc != ".":
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
                     # Annoying, because the vlm spent time on it, but we do get better results this way - probably because the analysis is done using the grid images without the vlm results affecting it
                     doc = ""
