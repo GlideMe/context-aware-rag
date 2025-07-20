@@ -64,10 +64,13 @@ class BatchSummarization(Function):
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+                if images:
+                    content_blocks += [
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
+                    ]
 
             # Add the user question after the images (if any)
-            content_blocks.append({"type": "text", "text": inputs["input"]})
+            content_blocks += [{"type": "text", "text": f"User question: {inputs['input']}"}]
 
             return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
 
