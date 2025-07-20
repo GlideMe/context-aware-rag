@@ -166,7 +166,7 @@ class BatchSummarization(Function):
                         images = [image_file_to_base64(img) for img in list(unique_images)]
                     else:
                         images = []
-                        
+
                     batch_summary = await call_token_safe(
                         {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
