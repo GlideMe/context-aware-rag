@@ -53,11 +53,11 @@ class GraphRetrieval:
         self,
         llm,
         graph: Neo4jGraphDB,
+        model_name,
         multi_channel=False,
         uuid="default",
         top_k=None,
         endless_ai_enabled=False,
-        model_name,
     ):
         self.chat_llm = llm
         self.graph_db = graph
