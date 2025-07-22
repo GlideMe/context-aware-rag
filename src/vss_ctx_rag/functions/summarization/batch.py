@@ -61,7 +61,7 @@ class BatchSummarization(Function):
     def setup(self):
         def prepare_messages(inputs):
             system_prompt = self.get_param("prompts", "caption_summarization")
-
+            logger.info(f"BATCH DEBUG: prompt88= {system_prompt}")
             content_blocks = []
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
@@ -73,7 +73,8 @@ class BatchSummarization(Function):
                     content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             # Add the user question after the images (if any)
-            content_blocks.append({"type": "text", "text": inputs["input"]})
+            if not self.endless_ai_enabled or inputs["input"]:
+                content_blocks.append({"type": "text", "text": inputs["input"]})
 
             logger.info(f"BATCH DEBUG: content_blocks count = {len(content_blocks)}")
             logger.info(f"BATCH DEBUG: content_blocks types = {[block.get('type', 'unknown') for block in content_blocks]}")
