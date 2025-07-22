@@ -75,6 +75,10 @@ class BatchSummarization(Function):
             # Add the user question after the images (if any)
             content_blocks.append({"type": "text", "text": inputs["input"]})
 
+            logger.info(f"BATCH DEBUG: content_blocks = {content_blocks}")
+            logger.info(f"BATCH DEBUG: inputs['input'] = {repr(inputs['input'])}")
+            logger.info(f"BATCH DEBUG: inputs keys = {list(inputs.keys())}")
+
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
