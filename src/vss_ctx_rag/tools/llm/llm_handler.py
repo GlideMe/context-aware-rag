@@ -242,7 +242,7 @@ class ClaudeBedrockLLM(BaseChatModel):
                 
             except (BotoCoreError, ClientError) as e:
                 if "ThrottlingException" in str(e) and attempt < 2:
-                    delay = (attempt + 1) * 2  # 2, 4 seconds
+                    delay = (attempt + 1) * 3  # 2, 4 seconds
                     logger.warning(f"Claude throttled, retrying in {delay}s...")
                     time.sleep(delay)
                 else:
