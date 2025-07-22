@@ -75,7 +75,17 @@ class BatchSummarization(Function):
             # Add the user question after the images (if any)
             content_blocks.append({"type": "text", "text": inputs["input"]})
 
-            logger.info(f"BATCH DEBUG: content_blocks = {content_blocks}")
+            logger.info(f"BATCH DEBUG: content_blocks count = {len(content_blocks)}")
+            logger.info(f"BATCH DEBUG: content_blocks types = {[block.get('type', 'unknown') for block in content_blocks]}")
+
+            # For text blocks, show first 100 chars
+            for i, block in enumerate(content_blocks):
+                if block.get('type') == 'text':
+                    text_content = block.get('text', '')
+                    logger.info(f"BATCH DEBUG: content_block[{i}] text preview = '{text_content[:100]}...' (length: {len(text_content)})")
+                else:
+                    logger.info(f"BATCH DEBUG: content_block[{i}] type = {block.get('type', 'unknown')}")
+
             logger.info(f"BATCH DEBUG: inputs['input'] = {repr(inputs['input'])}")
             logger.info(f"BATCH DEBUG: inputs keys = {list(inputs.keys())}")
 
