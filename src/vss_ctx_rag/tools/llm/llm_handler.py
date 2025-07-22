@@ -28,11 +28,10 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
-from vss_ctx_rag.utils.utils import (
+from vss_ctx_rag.utils.common_utils import (
     is_openai_model,
     is_claude_model,
 )
-from vss_ctx_rag.utils.utils import is_openai_model
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
 
@@ -243,7 +242,7 @@ class ClaudeBedrockLLM(BaseChatModel):
                 
             except (BotoCoreError, ClientError) as e:
                 if "ThrottlingException" in str(e) and attempt < 2:
-                    delay = (attempt + 1) * 2  # 2, 4 seconds
+                    delay = (attempt + 1) * 3  # 2, 4 seconds
                     logger.warning(f"Claude throttled, retrying in {delay}s...")
                     time.sleep(delay)
                 else:
