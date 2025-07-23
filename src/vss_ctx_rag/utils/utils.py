@@ -151,7 +151,7 @@ class RequestInfo:
         notification_max_tokens: Optional[int] = None,
         rag_type: Optional[str] = None,
         endless_ai_enabled: bool = False,
-        chat_system_prompt: Optional[str] = None,
+        chat_system_prompt: str = "GO GO Gadget",
     ):
         self.summarize = summarize
         self.enable_chat = enable_chat
