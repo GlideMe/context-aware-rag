@@ -183,6 +183,7 @@ with open("config/config.yaml", mode="r", encoding="utf8") as c:
             self.notification_max_tokens = None
             self.rag_type = config["chat"]["rag"]
             self.endless_ai_enabled = False
+            self.chat_system_prompt = None
 
     req_info = RequestInfo()
 

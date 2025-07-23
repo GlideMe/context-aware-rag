@@ -56,6 +56,7 @@ class GraphRetrieval:
         uuid="default",
         top_k=None,
         endless_ai_enabled=False,
+        chat_system_prompt=None,
     ):
         self.chat_llm = llm
         self.graph_db = graph
@@ -79,7 +80,10 @@ class GraphRetrieval:
 
         def prepare_messages(inputs):
             context = inputs.get("context", "")
-            template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
+            if chat_system_prompt:
+                template = chat_system_prompt
+            else:
+                template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
             system_content = template.format(context=context)
             # logger.info(f"SystemMessage={system_content}")
             messages = [SystemMessage(content=system_content)]
