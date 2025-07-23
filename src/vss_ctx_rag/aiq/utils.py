@@ -48,6 +48,7 @@ class RequestInfo:
         self.notification_max_tokens = None
         self.rag_type = "vector-rag"
         self.endless_ai_enabled = False
+        self.chat_system_prompt = None
 
 
 def aiq_to_vss_config(
