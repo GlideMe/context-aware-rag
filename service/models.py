@@ -74,7 +74,7 @@ class RequestInfo(BaseModel):
     notification_max_tokens: Optional[int] = None
     rag_type: str = "vector-rag"
     endless_ai_enabled: bool = False
-    chat_system_prompt = None
+    chat_system_prompt: Optional[str] = None
 
 
 class CallRequest(BaseModel):
