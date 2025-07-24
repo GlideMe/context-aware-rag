@@ -67,8 +67,9 @@ class GraphRetrievalFunc(Function):
 
         self.endless_ai_enabled = self.get_param("endless_ai_enabled")
         self.chat_system_prompt = self.get_param("chat_system_prompt", required=False)
-
-        logger.info(f"self.chat_system_prompt: {self.chat_system_prompt}")#TODO: Remove!
+        self.highlight_system_prompt = self.get_param("highlight_system_prompt", required=False)
+        logger.info(f"self.chat_system_prompt: {self.chat_system_prompt} self.highlight_system_prompt: {self.highlight_system_prompt}")#TODO: Remove!
+        
 
         try:
             self.graph_retrieval = GraphRetrieval(
@@ -79,6 +80,7 @@ class GraphRetrievalFunc(Function):
                 top_k=self.top_k,
                 endless_ai_enabled=self.endless_ai_enabled,
                 chat_system_prompt=self.chat_system_prompt,
+                highlight_system_prompt=self.highlight_system_prompt,
             )
         except Exception as e:
             logger.error(f"Error initializing GraphRetrieval: {e}")

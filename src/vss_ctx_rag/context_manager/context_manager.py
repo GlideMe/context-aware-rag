@@ -361,6 +361,7 @@ class ContextManager:
                     "rag_type": req_info.rag_type,
                     "endless_ai_enabled": req_info.endless_ai_enabled,
                     "chat_system_prompt": req_info.chat_system_prompt,
+                    "highlight_system_prompt": req_info.highlight_system_prompt,
                 }
             )
 

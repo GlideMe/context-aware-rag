@@ -57,12 +57,14 @@ class GraphRetrieval:
         top_k=None,
         endless_ai_enabled=False,
         chat_system_prompt=None,
+        highlight_system_prompt=None,
     ):
         self.chat_llm = llm
         self.graph_db = graph
         self.chat_history = ChatMessageHistory()
         self.top_k = top_k
         self.endless_ai_enabled = endless_ai_enabled
+        self.highlight_system_prompt = highlight_system_prompt
         self.uuid = uuid
         self.multi_channel = multi_channel
         self.chat_system_prompt = chat_system_prompt
