@@ -64,10 +64,10 @@ class GraphRetrieval:
         self.chat_history = ChatMessageHistory()
         self.top_k = top_k
         self.endless_ai_enabled = endless_ai_enabled
+        self.chat_system_prompt = chat_system_prompt 
         self.highlight_system_prompt = highlight_system_prompt
         self.uuid = uuid
         self.multi_channel = multi_channel
-        self.chat_system_prompt = chat_system_prompt
         summarization_prompt = ChatPromptTemplate.from_messages(
             [
                 MessagesPlaceholder(variable_name="chat_history"),
