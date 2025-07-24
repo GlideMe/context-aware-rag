@@ -353,13 +353,12 @@ class BatchSummarization(Function):
                             )
                 doc_meta["batch_i"] = doc_i // self.batch_size
 
-
                 # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
-                if self.endless_ai_enabled and doc != ".":
+                #if self.endless_ai_enabled and doc != ".":
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
                     # Annoying, because the vlm spent time on it, but we do get better results this way - probably because the analysis is done using the grid images without the vlm results affecting it
-                    doc = ""
+                #    doc = ""
 
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)
                 if batch.is_full():
