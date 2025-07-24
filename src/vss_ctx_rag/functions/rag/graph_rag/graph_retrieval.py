@@ -65,6 +65,7 @@ class GraphRetrieval:
         self.endless_ai_enabled = endless_ai_enabled
         self.uuid = uuid
         self.multi_channel = multi_channel
+        self.chat_system_prompt = chat_system_prompt
         summarization_prompt = ChatPromptTemplate.from_messages(
             [
                 MessagesPlaceholder(variable_name="chat_history"),
@@ -80,10 +81,11 @@ class GraphRetrieval:
 
         def prepare_messages(inputs):
             context = inputs.get("context", "")
-            if chat_system_prompt:
-                template = chat_system_prompt
+            template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
+            if self.chat_system_prompt:
+                system_content = self.chat_system_prompt.format(context=context)
             else:
-                template = CHAT_SYSTEM_GRID_TEMPLATE if self.endless_ai_enabled else CHAT_SYSTEM_TEMPLATE
+                system_content = template.format(context=context)
             system_content = template.format(context=context)
             # logger.info(f"SystemMessage={system_content}")
             messages = [SystemMessage(content=system_content)]
