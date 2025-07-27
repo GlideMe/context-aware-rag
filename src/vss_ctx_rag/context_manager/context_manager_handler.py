@@ -441,7 +441,7 @@ class ContextManagerHandler:
         if config_to_print.get("api_key"):
             del config_to_print["api_key"]
         logger.info(
-            f"Updating context manager with config:\n{json.dumps(config_to_print, indent=2)}"
+            f"Updating context manager with config:\n{json.dumps(config_to_print, indent=2)}\nUpdate func: {self._functions}"
         )
         try:
             for fn, fn_config in config.items():
