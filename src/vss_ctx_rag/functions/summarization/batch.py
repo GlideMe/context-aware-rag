@@ -62,18 +62,40 @@ class BatchSummarization(Function):
         def prepare_messages(inputs):
             system_prompt = self.get_param("prompts", "caption_summarization")
             content_blocks = []
+            
+            # Log the system prompt
+            logger.info("prepare_messages - System prompt: '%s'", 
+                       system_prompt[:200] + "..." if len(system_prompt) > 200 else system_prompt)
+            
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
                 model_name = self.get_param("llm", "model")
+                
+                # Log image processing in message preparation
+                logger.info("prepare_messages - Processing %d images for model %s", len(images), model_name)
+                
                 if is_claude_model(model_name):
                     content_blocks.extend({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images)
+                    logger.info("prepare_messages - Added %d images as Claude format", len(images))
                 else:
                     content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+                    logger.info("prepare_messages - Added %d images as OpenAI format", len(images))
+            else:
+                logger.info("prepare_messages - endless_ai_enabled is False, no images added")
 
             # Add the user question after the images (if any)
             if inputs["input"] and inputs["input"].strip():
                 content_blocks.append({"type": "text", "text": inputs["input"]})
+                logger.info("prepare_messages - Added text input of length %d", len(inputs["input"]))
+                logger.info("prepare_messages - Text content: '%s'", 
+                           inputs["input"][:200] + "..." if len(inputs["input"]) > 200 else inputs["input"])
+            else:
+                logger.info("prepare_messages - No text input provided (input is empty or None)")
+            
+            # Final message composition
+            logger.info("prepare_messages - Final message has %d content blocks: %s", 
+                       len(content_blocks), [block["type"] for block in content_blocks])
 
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
@@ -144,32 +166,91 @@ class BatchSummarization(Function):
             logger.info(
                 "Batch %d is full. Processing ...", batch._batch_index
             )
+            
+            # Log batch grid content analysis
+            batch_list = batch.as_list()
+            total_docs_with_grids = 0
+            total_unique_grids = set()
+            
+            for doc, doc_i, doc_meta in batch_list:
+                if doc_meta.get("grid_filenames"):
+                    total_docs_with_grids += 1
+                    grids = doc_meta["grid_filenames"].split('|')
+                    total_unique_grids.update(grids)
+                    logger.info("Batch %d - Doc %d has %d grids: %s", 
+                               batch._batch_index, doc_i, len(grids), grids)
+            
+            logger.info("Batch %d summary - Docs with grids: %d/%d, Unique grids: %d", 
+                       batch._batch_index, total_docs_with_grids, len(batch_list), len(total_unique_grids))
+            
             try:
                 with self._get_appropriate_callback() as cb:
                     if self.endless_ai_enabled:
                         def image_file_to_base64(filepath):
-                            # Open the image file in binary mode
-                            with open(filepath, 'rb') as image_file:
-                                image_data = image_file.read()
+                            try:
+                                # Track file access
+                                logger.info("Converting image to base64: %s", filepath)
+                                
+                                # Check if file exists
+                                if not os.path.exists(filepath):
+                                    logger.error("Image file not found: %s", filepath)
+                                    return None
+                                    
+                                # Open the image file in binary mode
+                                with open(filepath, 'rb') as image_file:
+                                    image_data = image_file.read()
 
-                            # Encode the binary data to base64
-                            base64_data = base64.b64encode(image_data)
+                                # Track file size
+                                logger.info("Read image file %s - size: %d bytes", filepath, len(image_data))
 
-                            # Convert bytes to a string (optional)
-                            return base64_data.decode('utf-8')
+                                # Encode the binary data to base64
+                                base64_data = base64.b64encode(image_data)
+
+                                # Convert bytes to a string (optional)
+                                base64_string = base64_data.decode('utf-8')
+                                
+                                # Track conversion success
+                                logger.info("Successfully converted %s to base64 - length: %d", filepath, len(base64_string))
+                                
+                                return base64_string
+                                
+                            except Exception as e:
+                                logger.error("Failed to convert image %s to base64: %s", filepath, str(e))
+                                return None
 
                         # Fetch image data
                         unique_images = set()
                         for doc, doc_i, doc_meta in batch.as_list():
                             if doc_meta.get("grid_filenames"):
                                 unique_images.update(doc_meta["grid_filenames"].split('|'))
+                        
+                        logger.info("Batch %d - Processing %d unique images: %s", 
+                                   batch._batch_index, len(unique_images), list(unique_images))
+                        
                         images = [image_file_to_base64(img) for img in list(unique_images)]
+                        # Filter out None values from failed conversions
+                        images = [img for img in images if img is not None]
+                        
+                        # Confirm successful base64 conversion
+                        logger.info("Batch %d - Successfully converted %d images to base64 (sizes: %s)", 
+                                   batch._batch_index, len(images), [len(img) for img in images])
                     else:
                         images = []
+                        logger.info("Batch %d - endless_ai_enabled is False, no images processed", batch._batch_index)
+
+                    # Log what's being sent to the model
+                    input_text = " ".join([doc for doc, _, _ in batch.as_list()])
+                    logger.info("Batch %d - Input text being sent: '%s'", 
+                               batch._batch_index, 
+                               input_text[:200] + "..." if len(input_text) > 200 else input_text)
 
                     batch_summary = await call_token_safe(
-                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                        {"input": input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
                     )
+                    
+                    # Log what was actually sent to the model
+                    logger.info("Batch %d - Sent %d images to model with input length %d", 
+                               batch._batch_index, len(images), len(input_text))
             except Exception as e:
                 logger.error(
                     f"Error summarizing batch {batch._batch_index}: {e}"
@@ -289,6 +370,10 @@ class BatchSummarization(Function):
             elif len(batches) > 0:
                 with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
                     with self._get_appropriate_callback() as cb:
+                        # Log what's being sent to aggregation
+                        logger.info("Aggregating %d batches: %s", len(batches), 
+                                   [f"Batch {b['batch_i']}: {b['text'][:100]}..." for b in batches])
+                        
                         result = await call_token_safe(
                             batches,
                             self.aggregation_pipeline,
@@ -320,6 +405,19 @@ class BatchSummarization(Function):
     async def aprocess_doc(self, doc: str, doc_i: int, doc_meta: dict):
         try:
             logger.info("Adding doc %d", doc_i)
+            
+            # Track grid filenames in document metadata
+            if doc_meta.get("grid_filenames"):
+                logger.info("Doc %d has grid_filenames: %s", doc_i, doc_meta["grid_filenames"])
+                grid_count = len(doc_meta["grid_filenames"].split('|'))
+                logger.info("Doc %d contains %d grid images", doc_i, grid_count)
+            else:
+                logger.info("Doc %d has no grid_filenames", doc_i)
+            
+            # Log document content before processing
+            logger.info("Doc %d content before processing: '%s'", doc_i, 
+                       doc[:200] + "..." if len(doc) > 200 else doc)
+            
             doc_meta.setdefault("is_first", False)
             doc_meta.setdefault("is_last", False)
 
@@ -349,6 +447,8 @@ class BatchSummarization(Function):
                                 f"<{doc_meta['start_pts'] / 1e9:.2f}> <{doc_meta['end_pts'] / 1e9:.2f}> "
                                 + doc
                             )
+                            logger.info("Doc %d - Added timestamp prefix: <%f> <%f>", 
+                                       doc_i, doc_meta['start_pts'] / 1e9, doc_meta['end_pts'] / 1e9)
                         else:
                             logger.info(
                                 "start_pts or end_pts not found in doc_meta. "
@@ -362,6 +462,10 @@ class BatchSummarization(Function):
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
                     # Annoying, because the vlm spent time on it, but we do get better results this way - probably because the analysis is done using the grid images without the vlm results affecting it
                 #    doc = ""
+
+                # Log final document content before adding to batch
+                logger.info("Doc %d final content for batch: '%s'", doc_i, 
+                           doc[:200] + "..." if len(doc) > 200 else doc)
 
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)
                 if batch.is_full():
