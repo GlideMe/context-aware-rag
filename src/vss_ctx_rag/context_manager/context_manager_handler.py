@@ -441,11 +441,13 @@ class ContextManagerHandler:
         if config_to_print.get("api_key"):
             del config_to_print["api_key"]
         logger.info(
-            f"Updating context manager with config:\n{json.dumps(config_to_print, indent=2)}\nUpdate func: {self._functions}"
+            f"Updating context manager with config:\n{json.dumps(config_to_print, indent=2)}"
         )
         try:
             for fn, fn_config in config.items():
+                logger.info(f"Updating configuration for function '{fn}' with: {fn_config}")
                 if fn in self._functions:
+                    logger.info(f"yes {fn} is in")
                     self._functions[fn].update(**fn_config)
         except Exception as e:
             logger.error(
