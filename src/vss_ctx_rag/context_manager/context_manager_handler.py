@@ -318,7 +318,6 @@ class ContextManagerHandler:
 
             if req_info:
                 chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
-                chat_config["chat_system_prompt"] = req_info.chat_system_prompt
                 
             if (
                 req_info
@@ -347,6 +346,8 @@ class ContextManagerHandler:
                     self.rag_type = None
                 if self.get_function("chat") is None:
                     logger.info("Setting up QnA, rag type: %s", chat_config["rag"])
+
+                    chat_config["params"]["chat_system_prompt"] = req_info.chat_system_prompt
 
                     chat_config["params"] = chat_config.get(
                         "params",
