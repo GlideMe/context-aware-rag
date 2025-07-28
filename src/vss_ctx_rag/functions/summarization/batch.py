@@ -167,9 +167,18 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
-                    batch_summary = await call_token_safe(
-                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
-                    )
+                    if len(batch.as_list()) > 1 or len(images) > 0:
+                        batch_summary = await call_token_safe(
+                            {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                        )
+                    else:
+                        doc, _, _ = batch.as_list()[0]
+                        if doc.strip() == ".":
+                            batch_summary = "Video Analysis completed."
+                        else:
+                            batch_summary = await call_token_safe(
+                                {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                            )
             except Exception as e:
                 logger.error(
                     f"Error summarizing batch {batch._batch_index}: {e}"
