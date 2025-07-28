@@ -48,6 +48,7 @@ from vss_ctx_rag.utils.globals import (
     LLM_TOOL_NAME,
     DEFAULT_MULTI_CHANNEL,
     DEFAULT_CHAT_HISTORY,
+    DEFAULT_ENDLESS_AI_ENABLED,
 )
 from vss_ctx_rag.functions.rag.chat_function import ChatFunction
 
@@ -242,7 +243,6 @@ class ContextManagerHandler:
             if req_info:
                 caption_summarization_prompt = req_info.caption_summarization_prompt
                 summary_aggregation_prompt = req_info.summary_aggregation_prompt
-                summ_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             try:
                 self.default_caption_prompt = summ_config["prompts"]["caption"]
@@ -286,6 +286,10 @@ class ContextManagerHandler:
                     summ_config["params"]["batch_size"] = summ_config["params"].get(
                         "batch_size", DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE
                     )
+                    summ_config["params"]["endless_ai_enabled"] = summ_config["params"].get(
+                        "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
+                    )
+                    logger.info(f"elad^1 {summ_config["params"]["endless_ai_enabled"]}") # TODO: REMOVE!
                     try:
                         if req_info and req_info.is_live:
                             logger.debug("Req Info: %s", req_info.summary_duration)
@@ -315,9 +319,6 @@ class ContextManagerHandler:
                 self.remove_function("summarization")
                 logger.info("Summarization disabled with the API call")
             chat_config = copy.deepcopy(config.get("chat"))
-
-            if req_info:
-                chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
 
             if (
                 req_info
@@ -366,7 +367,10 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_history"] = chat_config["params"].get(
                         "chat_history", DEFAULT_CHAT_HISTORY
                     )
-                    
+                    chat_config["params"]["endless_ai_enabled"] = chat_config["params"].get(
+                        "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
+                    )
+                    logger.info(f"elad^2 {chat_config["params"]["endless_ai_enabled"]}") # TODO: REMOVE!
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)
