@@ -445,9 +445,7 @@ class ContextManagerHandler:
         )
         try:
             for fn, fn_config in config.items():
-                logger.info(f"Updating configuration for function '{fn}' with: {fn_config}")
                 if fn in self._functions:
-                    logger.info(f"yes {fn} is in")
                     self._functions[fn].update(**fn_config)
         except Exception as e:
             logger.error(
