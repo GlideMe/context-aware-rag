@@ -347,15 +347,16 @@ class ContextManagerHandler:
                 if self.get_function("chat") is None:
                     logger.info("Setting up QnA, rag type: %s", chat_config["rag"])
 
-                    chat_config["params"]["chat_system_prompt"] = chat_config["params"].get(
-                        "chat_system_prompt", None
-                    )
                     chat_config["params"] = chat_config.get(
                         "params",
                         {
                             "batch_size": DEFAULT_GRAPH_RAG_BATCH_SIZE,
                             "top_k": DEFAULT_RAG_TOP_K,
                         },
+                    )
+
+                    chat_config["params"]["chat_system_prompt"] = chat_config["params"].get(
+                        "chat_system_prompt", None
                     )
                     chat_config["params"]["batch_size"] = chat_config["params"].get(
                         "batch_size", DEFAULT_GRAPH_RAG_BATCH_SIZE
