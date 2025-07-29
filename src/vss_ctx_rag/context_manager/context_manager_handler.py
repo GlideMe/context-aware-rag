@@ -318,7 +318,7 @@ class ContextManagerHandler:
 
             if req_info:
                 chat_config["endless_ai_enabled"] = req_info.endless_ai_enabled
-                
+
             if (
                 req_info
                 and req_info.rag_type
