@@ -347,8 +347,9 @@ class ContextManagerHandler:
                 if self.get_function("chat") is None:
                     logger.info("Setting up QnA, rag type: %s", chat_config["rag"])
 
-                    chat_config["params"]["chat_system_prompt"] = req_info.chat_system_prompt
-
+                    chat_config["params"]["chat_system_prompt"] = chat_config["params"].get(
+                        "chat_system_prompt", None
+                    )
                     chat_config["params"] = chat_config.get(
                         "params",
                         {
