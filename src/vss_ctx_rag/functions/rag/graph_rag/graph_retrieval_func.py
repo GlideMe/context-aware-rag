@@ -18,6 +18,8 @@ import os
 from re import compile
 import traceback
 
+import json # TODO:REMOVE!!!
+
 from langchain_core.output_parsers import StrOutputParser
 
 from vss_ctx_rag.base import Function
@@ -66,13 +68,13 @@ class GraphRetrievalFunc(Function):
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
         self.endless_ai_enabled = self.get_param("endless_ai_enabled")
-        logger.info(f"elad^^ dict: {self.config}") #TODO: Remove
-        self.chat_system_prompt = (
-            self.get_param("params", "chat_system_prompt", required=False)
-            if self.get_param("params", "chat_system_prompt", required=False)
-            else None
-        )
-        logger.info(f"elad^^ self.chat_system_prompt: {self.chat_system_prompt}") #TODO: Remove
+        logger.info(f"elad^^ dict: {json.dumps(self.config, indent=2)}") #TODO: Remove
+        # self.chat_system_prompt = (
+        #     self.get_param("params", "chat_system_prompt", required=False)
+        #     if self.get_param("params", "chat_system_prompt", required=False)
+        #     else None
+        # )
+        # logger.info(f"elad^^ self.chat_system_prompt: {self.chat_system_prompt}") #TODO: Remove
         try:
             self.graph_retrieval = GraphRetrieval(
                 llm=self.chat_llm,
@@ -81,7 +83,7 @@ class GraphRetrievalFunc(Function):
                 uuid=uuid,
                 top_k=self.top_k,
                 endless_ai_enabled=self.endless_ai_enabled,
-                chat_system_prompt=self.chat_system_prompt,
+                # chat_system_prompt=self.chat_system_prompt,
             )
         except Exception as e:
             logger.error(f"Error initializing GraphRetrieval: {e}")
