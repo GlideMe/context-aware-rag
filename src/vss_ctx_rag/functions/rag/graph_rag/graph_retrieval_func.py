@@ -70,7 +70,6 @@ class GraphRetrievalFunc(Function):
         self.endless_ai_enabled = self.get_param("endless_ai_enabled")
         self.chat_system_prompt = self.get_param("params", "chat_system_prompt", required=False)
 
-        logger.info(f"elad^^ self.chat_system_prompt: {self.chat_system_prompt}") #TODO: Remove
         try:
             self.graph_retrieval = GraphRetrieval(
                 llm=self.chat_llm,

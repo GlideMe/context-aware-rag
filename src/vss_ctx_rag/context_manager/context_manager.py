@@ -360,17 +360,13 @@ class ContextManager:
                     "summary_duration": req_info.summary_duration,
                     "rag_type": req_info.rag_type,
                     "endless_ai_enabled": req_info.endless_ai_enabled,
-                    "chat_system_prompt": req_info.chat_system_prompt,
-                    "highlight_system_prompt": req_info.highlight_system_prompt,
                 }
             )
 
         if req_info_obj:
             logger.info(
-                "configure_update: passing endless_ai_enabled=%s, chat_system_prompt=%s, highlight_system_prompt=%s",
+                "configure_update: passing endless_ai_enabled=%s",
                 req_info_obj.endless_ai_enabled,
-                req_info_obj.chat_system_prompt,
-                req_info_obj.highlight_system_prompt
             )
             
         self.process.configure_update(config=config, req_info=req_info_obj)

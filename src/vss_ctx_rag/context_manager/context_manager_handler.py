@@ -358,6 +358,9 @@ class ContextManagerHandler:
                     chat_config["params"]["chat_system_prompt"] = chat_config["params"].get(
                         "chat_system_prompt", ""
                     )
+                    chat_config["params"]["highlight_system_prompt"] = chat_config["params"].get(
+                        "highlight_system_prompt", ""
+                    )
                     chat_config["params"]["batch_size"] = chat_config["params"].get(
                         "batch_size", DEFAULT_GRAPH_RAG_BATCH_SIZE
                     )

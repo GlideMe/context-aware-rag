@@ -151,8 +151,6 @@ class RequestInfo:
         notification_max_tokens: Optional[int] = None,
         rag_type: Optional[str] = None,
         endless_ai_enabled: bool = False,
-        chat_system_prompt: Optional[str] = None,
-        highlight_system_prompt: Optional[str] = None,
     ):
         self.summarize = summarize
         self.enable_chat = enable_chat
@@ -173,8 +171,6 @@ class RequestInfo:
         self.notification_max_tokens = notification_max_tokens
         self.rag_type = rag_type
         self.endless_ai_enabled = endless_ai_enabled
-        self.chat_system_prompt = chat_system_prompt
-        self.highlight_system_prompt = highlight_system_prompt
 
 
 def validate_config(config: Dict[str, Any]) -> None:
