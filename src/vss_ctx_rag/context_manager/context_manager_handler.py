@@ -289,7 +289,7 @@ class ContextManagerHandler:
                     summ_config["params"]["endless_ai_enabled"] = summ_config["params"].get(
                         "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
                     )
-                    logger.info(f"elad^1 {summ_config["params"]["endless_ai_enabled"]}") # TODO: REMOVE!
+                    
                     try:
                         if req_info and req_info.is_live:
                             logger.debug("Req Info: %s", req_info.summary_duration)
@@ -370,7 +370,6 @@ class ContextManagerHandler:
                     chat_config["params"]["endless_ai_enabled"] = chat_config["params"].get(
                         "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
                     )
-                    logger.info(f"elad^2 {chat_config["params"]["endless_ai_enabled"]}") # TODO: REMOVE!
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)
