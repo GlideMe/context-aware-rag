@@ -65,7 +65,7 @@ class GraphRetrievalFunc(Function):
         uuid = self.get_param("params", "uuid", required=False)
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
-        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
+        self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
         self.chat_system_prompt = self.get_param("params", "chat_system_prompt", required=False)
 
         try:
