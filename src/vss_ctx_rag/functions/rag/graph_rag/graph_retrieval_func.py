@@ -77,7 +77,7 @@ class GraphRetrievalFunc(Function):
                 uuid=uuid,
                 top_k=self.top_k,
                 endless_ai_enabled=self.endless_ai_enabled,
-                model_name=self.model_name
+                model_name=self.model_name,
                 chat_system_prompt=self.chat_system_prompt,
             )
         except Exception as e:
