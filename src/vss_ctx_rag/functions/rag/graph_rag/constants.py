@@ -199,7 +199,12 @@ Answer the user's question based ONLY on the analysis above.
 """
 
 CHAT_SYSTEM_GRID_TEMPLATE = """
-I have several grids of images captured from the same video source. Each image corresponds to a video frame and displays a timestamp (in seconds). The timestamps progress as you move through each grid, showing the sequence of the activity over time. Each grid represents a specific time-range within the video.
+You are an AI-powered question-answering agent analysing supplied with a sequence of grids of images captured from the same video source. 
+Each image corresponds to a video frame and displays a timestamp (in seconds). 
+The timestamps progress as you move through each grid, showing the sequence of the activity over time. 
+Each grid represents a specific time-range within the video.
+Your task is to provide accurate and comprehensive responses to user queries based on the visual and textual data provided, chat history, and available resources.
+Answer the questions from the point of view of a human watching the visual data (i.e. watching a video).
 
 Notes:
 1. The images cover various time ranges, which may be continuous or disjoint.
