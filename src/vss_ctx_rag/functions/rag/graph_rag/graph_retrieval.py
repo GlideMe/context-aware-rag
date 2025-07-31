@@ -35,6 +35,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from vss_ctx_rag.utils.ctx_rag_logger import TimeMeasure, logger
 from vss_ctx_rag.utils.utils import remove_think_tags, remove_lucene_chars
+from vss_ctx_rag.utils.common_utils import is_claude_model
 from vss_ctx_rag.functions.rag.graph_rag.constants import (
     CHAT_SEARCH_KWARG_SCORE_THRESHOLD,
     QUESTION_TRANSFORM_TEMPLATE,
@@ -52,6 +53,7 @@ class GraphRetrieval:
         self,
         llm,
         graph: Neo4jGraphDB,
+        model_name,
         multi_channel=False,
         uuid="default",
         top_k=None,
@@ -64,6 +66,7 @@ class GraphRetrieval:
         self.top_k = top_k
         self.endless_ai_enabled = endless_ai_enabled
         self.chat_system_prompt = chat_system_prompt 
+        self.model_name = model_name
         self.uuid = uuid
         self.multi_channel = multi_channel
         summarization_prompt = ChatPromptTemplate.from_messages(
@@ -98,8 +101,10 @@ class GraphRetrieval:
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-                # logger.info(f"Length of {len(images)} images={sum(len(img) for img in images)}")
-                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+                if is_claude_model(self.model_name):
+                    content_blocks.extend({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images)
+                else:
+                    content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             # Add the user question after the images (if any)
             content_blocks.append({"type": "text", "text": f"User question: {inputs['input']}"})

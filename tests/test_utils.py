@@ -5,7 +5,7 @@ import re
 import pytest
 
 # Extract the is_openai_model function source from utils.py without importing the module
-utils_path = os.path.join(os.path.dirname(__file__), "..", "src", "vss_ctx_rag", "utils", "utils.py")
+utils_path = os.path.join(os.path.dirname(__file__), "..", "src", "vss_ctx_rag", "utils", "utils.py", "common_utils.py")
 with open(utils_path) as f:
     source = f.read()
 
@@ -20,7 +20,7 @@ namespace = {"re": re}
 exec(func_source, namespace)
 
 is_openai_model = namespace["is_openai_model"]
-from vss_ctx_rag.utils.utils import is_claude_model
+from vss_ctx_rag.utils.common_utils import is_claude_model
 
 @pytest.mark.parametrize("model", [
     "gpt-4o",
