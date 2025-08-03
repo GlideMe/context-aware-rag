@@ -74,7 +74,6 @@ class GraphRetrievalFunc(Function):
         self.chunk_size = self.get_param("params", "chunk_size", required=False)
         if self.chunk_size is None:
             self.chunk_size = 0
-        logger.info(f"ERANERAN TEST! self.chunk_size={self.chunk_size}")
 
         try:
             self.graph_retrieval = GraphRetrieval(
@@ -94,8 +93,6 @@ class GraphRetrievalFunc(Function):
     async def acall(self, state: dict) -> dict:
 
         def get_grids_using_graph(question: str, docs) -> set[str]:
-            # Add grid images according to chunks
-            #logger.info(f"docs={repr(docs)}")
             prompt_token_cutoff = 5
             sorted_documents = sorted(
                 docs,
@@ -124,11 +121,9 @@ class GraphRetrievalFunc(Function):
             content_blocks = []
             batch_index_to_grids = {}
             for batch in all_batches:
-                logger.info(f"batch={batch}")
                 content_blocks.append({"type": "text", "text": batch['text']})
                 batch_index_to_grids[batch['batch_i']] = batch['grid_filenames']
             content_blocks.append({"type": "text", "text": f"User question: {question}"})
-            logger.info(f"batch_index_to_grids={batch_index_to_grids}")
 
             class TimeRange(BaseModel):
                 start: float = Field(..., ge=0, description="Start of the range in seconds.")
@@ -150,24 +145,20 @@ Output only the time-ranges, no extra text.
 """
 
             time_ranges_list = structured_llm.invoke([SystemMessage(content=system_content), HumanMessage(content=content_blocks)])
-            logger.info(f"ERANERAN time_ranges_list={time_ranges_list}")
-            logger.info(f"chunk_size={self.chunk_size}")
+            logger.info(f"time_ranges_list={time_ranges_list}")
 
+            # Add grid images according to chunks
             unique_images = []
-            unique_images_set = set()
             if time_ranges_list:
+                unique_images_set = set()
                 for time_range in time_ranges_list.time_ranges:
                     batch_index = int(time_range.start / self.chunk_size)
-                    logger.info(f"ERANERAN batch_index={batch_index}")
-
                     grid_str = batch_index_to_grids.get(batch_index)
-                    logger.info(f"ERANERAN batch_index_to_grids[batch_index]={grid_str}")
                     if grid_str:
                         for grid_filename in grid_str.split("|"):
                             if grid_filename not in unique_images_set:
                                 unique_images_set.add(grid_filename)
                                 unique_images.append(grid_filename)
-
             return unique_images
 
         try:
