@@ -94,15 +94,13 @@ class GraphRetrieval:
             for msg in inputs["messages"]:
                 messages.append(msg)
 
-            content_blocks = []
+            # Add the user question before the images (if any)
+            content_blocks = [{"type": "text", "text": f"User question: {inputs['input']}"}]
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
                 # logger.info(f"Length of {len(images)} images={sum(len(img) for img in images)}")
                 content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
-
-            # Add the user question after the images (if any)
-            content_blocks.append({"type": "text", "text": f"User question: {inputs['input']}"})
 
             messages.append(HumanMessage(content=content_blocks))
 
