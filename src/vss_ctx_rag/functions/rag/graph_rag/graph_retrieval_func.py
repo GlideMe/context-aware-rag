@@ -104,12 +104,16 @@ class GraphRetrievalFunc(Function):
             )
             documents = sorted_documents[:prompt_token_cutoff]
 
-            unique_images = set()
+            unique_images = []
+            unique_images_set = set()
             for doc in documents:
                 for chunkdetail in doc.metadata["chunkdetails"]:
                     logger.info(f"ERANERAN chunkIdx={chunkdetail['chunkIdx']}")
                     if chunkdetail['grid_filenames']:
-                        unique_images.update(chunkdetail['grid_filenames'].split('|'))
+                        for grid_filename in chunkdetail['grid_filenames'].split("|"):
+                            if grid_filename not in unique_images_set:
+                                unique_images_set.add(grid_filename)
+                                unique_images.append(grid_filename)
 
             return unique_images
 
@@ -149,7 +153,8 @@ Output only the time-ranges, no extra text.
             logger.info(f"ERANERAN time_ranges_list={time_ranges_list}")
             logger.info(f"chunk_size={self.chunk_size}")
 
-            unique_images = set()
+            unique_images = []
+            unique_images_set = set()
             if time_ranges_list:
                 for time_range in time_ranges_list.time_ranges:
                     batch_index = int(time_range.start / self.chunk_size)
@@ -158,7 +163,11 @@ Output only the time-ranges, no extra text.
                     grid_str = batch_index_to_grids.get(batch_index)
                     logger.info(f"ERANERAN batch_index_to_grids[batch_index]={grid_str}")
                     if grid_str:
-                        unique_images.update(grid_str.split('|'))
+                        for grid_filename in grid_str.split("|"):
+                            if grid_filename not in unique_images_set:
+                                unique_images_set.add(grid_filename)
+                                unique_images.append(grid_filename)
+
             return unique_images
 
         try:
@@ -193,7 +202,7 @@ Output only the time-ranges, no extra text.
                 # logger.info(f"first chunk info={docs[0].metadata['chunkdetails']}")
 
 
-            logger.info(f"unique_images={list(unique_images)}")
+            logger.info(f"unique_images={unique_images}")
             if unique_images:
                 def image_file_to_base64(filepath):
                     # Open the image file in binary mode
@@ -205,7 +214,7 @@ Output only the time-ranges, no extra text.
 
                     # Convert bytes to a string
                     return base64_data.decode('utf-8')
-                images = [image_file_to_base64(img) for img in list(unique_images)]
+                images = [image_file_to_base64(img) for img in unique_images]
             else:
                 images = []
 

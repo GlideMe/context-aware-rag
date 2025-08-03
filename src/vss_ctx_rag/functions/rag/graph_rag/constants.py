@@ -199,7 +199,8 @@ Answer the user's question based ONLY on the analysis above.
 """
 
 CHAT_SYSTEM_GRID_TEMPLATE = """
-I have several grids of images captured from the same video source. Each image corresponds to a video frame and displays a timestamp (in seconds). The timestamps progress as you move through each grid, showing the sequence of the activity over time. Each grid represents a specific time-range within the video.
+You are an AI-powered question-answering agent analyzing video. You'll be provided with relevant sections of the video, in the form of grids of images.
+The grids of images are captured from the same video source. Each image corresponds to a video frame and displays a timestamp (in seconds). The timestamps progress as you move through each grid, showing the sequence of the activity over time. Each grid represents a specific time-range within the video.
 
 Notes:
 1. The images cover various time ranges, which may be continuous or disjoint.
