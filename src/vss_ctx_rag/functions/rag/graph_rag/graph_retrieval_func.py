@@ -25,6 +25,7 @@ from vss_ctx_rag.tools.storage.neo4j_db import Neo4jGraphDB
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import GraphMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import TimeMeasure, logger
+from vss_ctx_rag.functions.rag.graph_rag.constants import CHAT_SYSTEM_FIND_RELEVANT_GRIDS_TEMPLATE
 from vss_ctx_rag.functions.rag.graph_rag.graph_retrieval import GraphRetrieval
 from vss_ctx_rag.utils.globals import (
     DEFAULT_RAG_TOP_K,
@@ -105,13 +106,11 @@ class GraphRetrievalFunc(Function):
             unique_images_set = set()
             for doc in documents:
                 for chunkdetail in doc.metadata["chunkdetails"]:
-                    logger.info(f"ERANERAN chunkIdx={chunkdetail['chunkIdx']}")
                     if chunkdetail['grid_filenames']:
                         for grid_filename in chunkdetail['grid_filenames'].split("|"):
                             if grid_filename not in unique_images_set:
                                 unique_images_set.add(grid_filename)
                                 unique_images.append(grid_filename)
-
             return unique_images
 
         async def get_grids_using_llm(question: str) -> set[str]:
@@ -134,18 +133,8 @@ class GraphRetrievalFunc(Function):
 
             structured_llm = self.chat_llm.with_structured_output(TimeRangesList)
 
-            system_content = """
-Your task is to analyze the provided textual summaries and return 3 relevant time-ranges (in seconds) when the queried event occurs.
-If the user asks for the earliest, initial, or first occurrence, return only the first 3 distinct moments when the event begins or is set up.
-If the user asks for the latest, most recent, or final occurrence, return only the last 3 distinct moments when the event is initiated, set up, or adjusted.
-Only select timestamps clearly described as starting an event or range (e.g., “starts,” “begins to,” “sets up,” “removes,” “concludes”).
-If an event spans a time range, return the start of the range. Do not include multiple timestamps from the same continuous event or range—only one per distinct occurrence.
-Return exactly 3 time-ranges from distinct event occurrences.
-Output only the time-ranges, no extra text.
-"""
-
-            time_ranges_list = structured_llm.invoke([SystemMessage(content=system_content), HumanMessage(content=content_blocks)])
-            logger.info(f"time_ranges_list={time_ranges_list}")
+            time_ranges_list = structured_llm.invoke([SystemMessage(content=CHAT_SYSTEM_FIND_RELEVANT_GRIDS_TEMPLATE), HumanMessage(content=content_blocks)])
+            # logger.info(f"time_ranges_list={time_ranges_list}")
 
             # Add grid images according to chunks
             unique_images = []
@@ -160,6 +149,7 @@ Output only the time-ranges, no extra text.
                                 unique_images_set.add(grid_filename)
                                 unique_images.append(grid_filename)
             return unique_images
+
 
         try:
             question = state.get("question", "").strip()
@@ -176,7 +166,7 @@ Output only the time-ranges, no extra text.
                 user_message = HumanMessage(content=question)
                 self.graph_retrieval.add_message(user_message)
 
-            bypass_graph = True # use LLM with batches summary to find the relevant grids
+            bypass_graph = True # Find the relevant grids using Graph or LLM with batch summaries
             if self.endless_ai_enabled and bypass_graph:
                 unique_images = await get_grids_using_llm(question)
                 formatted_docs = ""
@@ -186,14 +176,13 @@ Output only the time-ranges, no extra text.
                     unique_images = get_grids_using_graph(question, docs)
                 else:
                     unique_images = []
-
                 formatted_docs = self.graph_retrieval.process_documents(docs)
                 # logger.info(f"formatted_docs={formatted_docs}")
                 # logger.info(f"formatted_docs (first)={formatted_docs.split('\n\n\n')[0]}")
                 # logger.info(f"first chunk info={docs[0].metadata['chunkdetails']}")
 
 
-            logger.info(f"unique_images={unique_images}")
+            # logger.info(f"unique_images={unique_images}")
             if unique_images:
                 def image_file_to_base64(filepath):
                     # Open the image file in binary mode

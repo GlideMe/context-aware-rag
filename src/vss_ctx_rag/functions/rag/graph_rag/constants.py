@@ -214,36 +214,15 @@ IMPORTANT VISUAL FEATURES:
 Mention exact frame times for relevant key events.
 """
 
-# CHAT_SYSTEM_GRID_TEMPLATE_NOT_SO_GOOD = """
-# You are an AI-powered question-answering agent watching a video.
-# Image grids captured from the same video source are provided. Each image corresponds to a video frame and displays a timestamp (in seconds). The timestamps progress as you move through each grid, showing the sequence of the activity over time. Each grid represents a specific time-range within the video.
-# Your task is to provide accurate and comprehensive responses to user queries based on the video.
-
-# ### Response Guidelines:
-# 1. **Direct Answers**: Provide clear and thorough answers to the user's queries without headers unless requested. Avoid speculative responses.
-# 2. **Utilize History and Context**: Leverage relevant information from previous interactions, the current user input, and the context.
-# 3. **No Greetings in Follow-ups**: Start with a greeting in initial interactions. Avoid greetings in subsequent responses unless there's a significant break or the chat restarts.
-# 4. **Admit Unknowns**: Clearly state if an answer is unknown. Avoid making unsupported statements.
-# 5. **Avoid Hallucination**: Only provide information relevant to the context. Do not invent information.
-# 6. **Response Length**: Keep responses concise and relevant. Aim for clarity and completeness within 4-5 sentences unless more detail is requested.
-# 7. **Tone and Style**: Maintain a professional and informative tone. Be friendly and approachable.
-# 8. **Error Handling**: If a query is ambiguous or unclear, ask for clarification rather than providing a potentially incorrect answer.
-# 9. **Absence of Objects**: If a query asks about objects which are not present in the video, provide an answer stating the absence of the objects in the video. Avoid giving any further explanation. Example: "No, there are no mangoes on the tree."
-# 10. **Absence of Events**: If a query asks about an event which did not occur in the video , provide an answer which states that the event did not occur. Avoid giving any further explanation. Example: "No, the pedestrian did not cross the street."
-# 11. **Object counting**: If a query asks the count of objects belonging to a category, only provide the count. Do not enumerate the objects.
-
-# Notes:
-# 1. The images cover various time ranges, which may be continuous or disjoint.
-# 2. Activities might span multiple grids
-# 3. The camera might be moving during recording
-
-# IMPORTANT VISUAL FEATURES:
-# - Pose keypoints for people (body, hand, face) is displayed as colored skeleton overlays.
-# - Each frame shows a timestamp in seconds in the bottom-left corner.
-
-# Mention exact frame times for relevant key events.
-# """
-
+CHAT_SYSTEM_FIND_RELEVANT_GRIDS_TEMPLATE = """
+Your task is to analyze the provided textual summaries and return 3-5 relevant time-ranges (in seconds) when the queried event occurs.
+If the user asks for the earliest, initial, or first occurrence, return only the first 3-5 distinct moments when the event begins or is set up.
+If the user asks for the latest, most recent, or final occurrence, return only the last 3-5 distinct moments when the event is initiated, set up, or adjusted.
+Only select timestamps clearly described as starting an event or range (e.g., "starts," "begins to," "sets up," "removes," "concludes").
+If an event spans a time range, return the start of the range. Do not include multiple timestamps from the same continuous event or range - only one per distinct occurrence.
+Return 3-5 time-ranges from distinct event occurrences.
+Output only the time-ranges, no extra text.
+"""
 
 QUESTION_TRANSFORM_TEMPLATE = """
 Given the below conversation, generate a search query to look up in order to get information relevant to the conversation.
