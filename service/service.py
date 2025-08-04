@@ -86,6 +86,7 @@ async def init_context_manager(init_request: InitRequest):
             init_request.uuid if init_request.uuid else str(random.randint(0, 1000000))
         )
 
+        logger.info(f"^ELAD^ app_state.req_info.uuid {app_state.req_info.uuid}")
         app_state.ctx_mgr = ContextManager(config=config, req_info=app_state.req_info)
 
         return {
