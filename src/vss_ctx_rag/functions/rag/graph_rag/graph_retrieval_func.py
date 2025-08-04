@@ -141,7 +141,7 @@ class GraphRetrievalFunc(Function):
             if time_ranges_list:
                 unique_images_set = set()
                 for time_range in time_ranges_list.time_ranges:
-                    batch_index = int(time_range.start / self.chunk_size)
+                    batch_index = 0 if self.chunk_size == 0 else int(time_range.start / self.chunk_size)
                     grid_str = batch_index_to_grids.get(batch_index)
                     if grid_str:
                         for grid_filename in grid_str.split("|"):
