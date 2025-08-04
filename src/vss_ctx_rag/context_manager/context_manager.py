@@ -366,8 +366,8 @@ class ContextManager:
 
         if req_info_obj:
             logger.info(
-                "configure_update: passing endless_ai_enabled=%s, request info=%s",
-                req_info_obj.endless_ai_enabled, req_info
+                "configure_update: passing endless_ai_enabled=%s, request info request_id=%s, uuid:=%s",
+                req_info_obj.endless_ai_enabled, req_info.request_id, req_info.stream_id
             )
             
         self.process.configure_update(config=config, req_info=req_info_obj)
