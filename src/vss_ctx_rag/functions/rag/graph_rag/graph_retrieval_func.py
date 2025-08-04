@@ -93,7 +93,7 @@ class GraphRetrievalFunc(Function):
 
     async def acall(self, state: dict) -> dict:
 
-        def get_grids_using_graph(question: str, docs) -> set[str]:
+        def get_grids_using_graph(docs) -> list[str]:
             prompt_token_cutoff = 5
             sorted_documents = sorted(
                 docs,
@@ -113,7 +113,7 @@ class GraphRetrievalFunc(Function):
                                 unique_images.append(grid_filename)
             return unique_images
 
-        async def get_grids_using_llm(question: str) -> set[str]:
+        async def get_grids_using_llm(question: str) -> list[str]:
             all_batches = await self.vector_db.aget_text_data(
                 fields=["text", "batch_i", "grid_filenames"], filter="doc_type == 'caption_summary' and grid_filenames != ''"
             )
@@ -173,7 +173,7 @@ class GraphRetrievalFunc(Function):
             else:
                 docs = self.graph_retrieval.retrieve_documents()
                 if self.endless_ai_enabled:
-                    unique_images = get_grids_using_graph(question, docs)
+                    unique_images = get_grids_using_graph(docs)
                 else:
                     unique_images = []
                 formatted_docs = self.graph_retrieval.process_documents(docs)
