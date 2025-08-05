@@ -130,6 +130,20 @@ class ContextManagerHandler:
         api_key = self.config.get("api_key")
         return ChatOpenAITool(api_key=api_key, **llm_params)
 
+    def _get_llm_model(self, llm_tool: Optional[LLMTool]) -> str:
+        """Return the model name for the given llm tool if possible."""
+        if llm_tool is None:
+            return ""
+        for attr in ["model", "model_name", "model_id"]:
+            if hasattr(llm_tool, attr):
+                return getattr(llm_tool, attr)
+        llm_obj = getattr(llm_tool, "llm", None)
+        if llm_obj is not None:
+            for attr in ["model", "model_name", "model_id"]:
+                if hasattr(llm_obj, attr):
+                    return getattr(llm_obj, attr)
+        return ""
+
     def setup_neo4j(self, chat_config: Dict):
         try:
             self.neo4j_uri = os.getenv("GRAPH_DB_URI")
@@ -318,6 +332,39 @@ class ContextManagerHandler:
                 self.remove_function("summarization")
                 logger.info("Summarization disabled with the API call")
             chat_config = copy.deepcopy(config.get("chat"))
+
+            chat_llm_params = chat_config.get(LLM_TOOL_NAME, {})
+            new_model = chat_llm_params.get("model")
+            if new_model:
+                current_model = self._get_llm_model(self.chat_llm)
+                logger.info(f"current_model={current_model}, new_model={new_model}")
+                if is_claude_model(new_model):
+                    if not isinstance(self.chat_llm, ChatClaudeTool):
+                        logger.info(
+                            "Switching chat llm to Claude model: %s", new_model
+                        )
+                        self.chat_llm = self._create_llm_tool(chat_llm_params)
+                        #if self.get_function("chat") is not None:
+                        #    self.remove_function("chat")
+                        #    self.rag_type = None
+                    elif current_model != new_model:
+                        logger.info(
+                            "Updating Claude model id to: %s", new_model
+                        )
+                        self.chat_llm.llm.model_id = new_model
+                else:
+                    if (
+                        not isinstance(self.chat_llm, ChatOpenAITool)
+                        or current_model != new_model
+                    ):
+                        logger.info(
+                            "Recreating chat llm with model: %s", new_model
+                        )
+                        self.chat_llm = self._create_llm_tool(chat_llm_params)
+                        #if self.get_function("chat") is not None:
+                        #    self.remove_function("chat")
+                        #    self.rag_type = None
+
 
             if (
                 req_info
