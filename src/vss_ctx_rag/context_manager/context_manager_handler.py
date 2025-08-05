@@ -144,6 +144,21 @@ class ContextManagerHandler:
                     return getattr(llm_obj, attr)
         return ""
 
+    def _rebuild_graph_retrieval_chains(self):
+        """Rebuild chains for existing graph retrieval functions after LLM update."""
+
+        chat_function = self.get_function("chat")
+        if chat_function is None:
+            return
+        retrieval_function = chat_function.get_function("retrieval_function")
+        if (
+            retrieval_function is not None
+            and hasattr(retrieval_function, "graph_retrieval")
+        ):
+            retrieval_function.chat_llm = self.chat_llm
+            retrieval_function.graph_retrieval.chat_llm = self.chat_llm
+            retrieval_function.graph_retrieval._build_chains()
+
     def setup_neo4j(self, chat_config: Dict):
         try:
             self.neo4j_uri = os.getenv("GRAPH_DB_URI")
@@ -344,14 +359,13 @@ class ContextManagerHandler:
                             "Switching chat llm to Claude model: %s", new_model
                         )
                         self.chat_llm = self._create_llm_tool(chat_llm_params)
-                        #if self.get_function("chat") is not None:
-                        #    self.remove_function("chat")
-                        #    self.rag_type = None
+                        self._rebuild_graph_retrieval_chains()
                     elif current_model != new_model:
                         logger.info(
                             "Updating Claude model id to: %s", new_model
                         )
                         self.chat_llm.llm.model_id = new_model
+                        self._rebuild_graph_retrieval_chains()
                 else:
                     if (
                         not isinstance(self.chat_llm, ChatOpenAITool)
@@ -361,9 +375,7 @@ class ContextManagerHandler:
                             "Recreating chat llm with model: %s", new_model
                         )
                         self.chat_llm = self._create_llm_tool(chat_llm_params)
-                        #if self.get_function("chat") is not None:
-                        #    self.remove_function("chat")
-                        #    self.rag_type = None
+                        self._rebuild_graph_retrieval_chains()
 
 
             if (
