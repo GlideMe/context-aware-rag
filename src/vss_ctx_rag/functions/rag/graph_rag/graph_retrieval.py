@@ -102,10 +102,8 @@ class GraphRetrieval:
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-                if is_claude_model(self.model_name):
-                    content_blocks.extend({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images)
-                else:
-                    content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+
+                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             messages.append(HumanMessage(content=content_blocks))
 

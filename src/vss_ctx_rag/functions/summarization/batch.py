@@ -66,10 +66,8 @@ class BatchSummarization(Function):
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
                 model_name = self.get_param("llm", "model")
-                if is_claude_model(model_name):
-                    content_blocks.extend({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data":f"{img}"}} for img in images)
-                else:
-                    content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
+
+                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             # Add the user question after the images (if any)
             if inputs["input"] and inputs["input"].strip():
