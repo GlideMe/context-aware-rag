@@ -71,13 +71,13 @@ class GraphRetrieval:
         self.multi_channel = multi_channel
         summarization_prompt = ChatPromptTemplate.from_messages(
             [
-                MessagesPlaceholder(variable_name="chat_history"),
                 (
                     "system",
                     "Summarize the above chat messages into a concise message, \
                     focusing on key points and relevant details that could be useful for future conversations. \
                     Exclude all introductions and extraneous information.",
                 ),
+                MessagesPlaceholder(variable_name="chat_history"),
             ]
         )
         self.chat_history_summarization_chain = summarization_prompt | llm
