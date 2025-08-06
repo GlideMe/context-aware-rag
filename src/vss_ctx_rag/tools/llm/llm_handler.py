@@ -15,16 +15,14 @@
 
 import os
 import time
-import json
-import boto3
 from typing import Optional, Iterator, Dict, Any, List
-from botocore.exceptions import BotoCoreError, ClientError
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_aws import ChatBedrock
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
@@ -142,126 +140,6 @@ class ChatOpenAITool(LLMTool):
         self.llm = self.llm.with_config(configurable=configurable_dict)
 
 
-class ClaudeBedrockLLM(BaseChatModel):
-    """Direct boto3 implementation for Claude on AWS Bedrock"""
-    
-    # Pydantic field declarations
-    model_id: str
-    region_name: str
-    max_tokens: int
-    temperature: float
-    top_p: float
-    bedrock_client: Any = None
-    
-    def __init__(self, model_id: str, region_name: str = "us-east-1", llm_params: dict = None, **kwargs):
-        if llm_params is None:
-            llm_params = {}
-            
-        max_tokens = llm_params.get("max_tokens", 4096)
-        temperature = llm_params.get("temperature", 0.1)
-        top_p = llm_params.get("top_p", 0.9)
-        
-        # Pass fields to parent class
-        super().__init__(
-            model_id=model_id,
-            region_name=region_name,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            bedrock_client=None,
-            **kwargs
-        )                               
-        
-        # Initialize boto3 client
-        try:
-            self.bedrock_client = boto3.client(
-                service_name='bedrock-runtime',
-                region_name=region_name
-            )
-            logger.info(f"Initialized Bedrock client for region: {region_name}")
-        except Exception as e:
-            logger.error(f"Failed to initialize Bedrock client: {e}")
-            raise
-    
-    def _format_messages_for_claude(self, messages: List[BaseMessage]) -> Dict[str, Any]:
-        """Convert LangChain messages to Claude Bedrock format"""
-        formatted_messages = []
-        
-        body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "messages": formatted_messages
-        }
-        
-        for msg in messages:
-            if isinstance(msg, HumanMessage):
-                formatted_messages.append({
-                    "role": "user",
-                    "content": msg.content
-                })
-            elif isinstance(msg, AIMessage):
-                formatted_messages.append({
-                    "role": "assistant", 
-                    "content": msg.content
-                })
-            elif isinstance(msg, SystemMessage):
-                # SystemMessage - Claude handles these separately in the "system" field
-                body["system"] = str(msg.content)
-        
-        return body
-    
-    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
-        """Generate a single response using Bedrock with simple retry logic"""
-        
-        # Format messages for Claude
-        body = self._format_messages_for_claude(messages)
-        
-        # Simple retry loop - try 3 times with increasing delays
-        for attempt in range(3):
-            try:
-                # Call Bedrock
-                response = self.bedrock_client.invoke_model(
-                    modelId=self.model_id,
-                    body=json.dumps(body),
-                    contentType='application/json'
-                )
-                
-                # Parse response
-                response_body = json.loads(response['body'].read())
-                content_list = response_body.get('content', [])
-                if content_list:
-                    content = content_list[0].get('text', '')
-                else:
-                    content = ''
-                
-                # Create ChatGeneration
-                generation = ChatGeneration(message=AIMessage(content=content))
-                return ChatResult(generations=[generation])
-                
-            except (BotoCoreError, ClientError) as e:
-                if "ThrottlingException" in str(e) and attempt < 2:
-                    delay = (attempt + 1) * 3  # 2, 4 seconds
-                    logger.warning(f"Claude throttled, retrying in {delay}s...")
-                    time.sleep(delay)
-                else:
-                    logger.error(f"AWS Bedrock error: {e}")
-                    raise
-            except Exception as e:
-                logger.error(f"Unexpected error calling Claude: {e}")
-                raise
-    
-    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
-        """Stream response from Bedrock (simplified - yields single response)"""
-        # For now, just return the full response
-        # Full streaming would require invoke_model_with_response_stream
-        result = self._generate(messages, stop, **kwargs)
-        yield result.generations[0]
-    
-    @property
-    def _llm_type(self) -> str:
-        return "claude-bedrock-boto3"
 
 
 class ChatClaudeTool(LLMTool):
@@ -273,20 +151,25 @@ class ChatClaudeTool(LLMTool):
         region_name = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
         model_id = model or "us.anthropic.claude-sonnet-4-20250514-v1:0"
         
-        # Extract parameters for our custom LLM
+        # Extract parameters for ChatBedrock
         max_tokens = llm_params.get("max_tokens", 4096)
         temperature = llm_params.get("temperature", 0.1)
         top_p = llm_params.get("top_p", 0.9)
         
-        logger.info(f"Initializing Claude Bedrock client for model: {model_id}")
+        logger.info(f"Initializing ChatBedrock client for model: {model_id}")
         
-        # Create our custom boto3-based LLM
-        claude_llm = ClaudeBedrockLLM(
+        # Create ChatBedrock LLM from langchain-aws
+        claude_llm = ChatBedrock(
             model_id=model_id,
             region_name=region_name,
-            llm_params=llm_params
+            model_kwargs={
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "top_p": top_p
+            }
+        ).configurable_fields(
+            model_kwargs=ConfigurableField(id="model_kwargs")
         )
-        
         
         super().__init__(
             llm=claude_llm,
@@ -337,18 +220,24 @@ class ChatClaudeTool(LLMTool):
     def update(self, top_p=None, temperature=None, max_tokens=None):
         """Update Claude model configuration with validation and optimization."""
         
-        # Validate and optimize parameters for Claude Sonnet
+        # Get current model_kwargs
+        current_kwargs = getattr(self.llm, 'model_kwargs', {})
+        
+        # Update with new values
         if top_p is not None:
             top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
-            self.llm.top_p = top_p
+            current_kwargs['top_p'] = top_p
             
         if temperature is not None:
             temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
-            self.llm.temperature = temperature
+            current_kwargs['temperature'] = temperature
             
         if max_tokens is not None:
             # Optimize for Claude Sonnet's capabilities
             max_tokens = max(1, min(4096, int(max_tokens)))  # Clamp to model limits
-            self.llm.max_tokens = max_tokens
+            current_kwargs['max_tokens'] = max_tokens
         
-        logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
+        # Update the LLM configuration
+        self.llm = self.llm.with_config(configurable={"model_kwargs": current_kwargs})
+        
+        logger.debug(f"Updated Claude LLM configuration: {current_kwargs}")
