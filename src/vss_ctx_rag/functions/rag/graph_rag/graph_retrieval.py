@@ -53,7 +53,6 @@ class GraphRetrieval:
         self,
         llm,
         graph: Neo4jGraphDB,
-        model_name,
         multi_channel=False,
         uuid="default",
         top_k=None,
@@ -66,7 +65,6 @@ class GraphRetrieval:
         self.top_k = top_k
         self.endless_ai_enabled = endless_ai_enabled
         self.chat_system_prompt = chat_system_prompt 
-        self.model_name = model_name
         self.uuid = uuid
         self.multi_channel = multi_channel
         summarization_prompt = ChatPromptTemplate.from_messages(

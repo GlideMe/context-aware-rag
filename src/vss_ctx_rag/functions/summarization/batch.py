@@ -65,7 +65,6 @@ class BatchSummarization(Function):
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-                model_name = self.get_param("llm", "model")
 
                 content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
