@@ -39,7 +39,7 @@ from vss_ctx_rag.utils.globals import (
     DEFAULT_EMBEDDING_PARALLEL_COUNT,
 )
 from vss_ctx_rag.functions.rag.graph_rag.constants import QUERY_TO_DELETE_UUID_GRAPH
-from vss_ctx_rag.utils.utils import is_claude_model
+from vss_ctx_rag.utils.common_utils import is_claude_model
 
 
 class GraphExtractionFunc(Function):
@@ -63,7 +63,7 @@ class GraphExtractionFunc(Function):
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
 
-        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
+        self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
         logger.info(f"Graph endless_ai_enabled value: {self.endless_ai_enabled}")
 
         self.batcher = Batcher(self.batch_size)
@@ -125,8 +125,7 @@ class GraphExtractionFunc(Function):
                 ):
                     try:
                         # Detect which model we're using
-                        model_name = getattr(self.chat_llm.llm, 'model_id', '') or getattr(self.chat_llm.llm, 'model', '')
-                        
+                        model_name = self.get_param("llm", "model")                        
                         if is_claude_model(model_name):
                             with get_bedrock_anthropic_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)

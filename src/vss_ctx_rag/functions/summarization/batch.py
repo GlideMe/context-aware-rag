@@ -25,7 +25,8 @@ from schema import Schema
 import base64
 
 from vss_ctx_rag.base import Function
-from vss_ctx_rag.utils.utils import remove_think_tags, is_claude_model
+from vss_ctx_rag.utils.utils import remove_think_tags, call_token_safe
+from vss_ctx_rag.utils.common_utils import is_claude_model
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
@@ -36,7 +37,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from vss_ctx_rag.utils.utils import call_token_safe
 
 
 class BatchSummarization(Function):
@@ -60,17 +60,20 @@ class BatchSummarization(Function):
 
     def setup(self):
         def prepare_messages(inputs):
-            # start with the user text
-            content_blocks = [{"type": "text", "text": inputs["input"]}]
+            system_prompt = self.get_param("prompts", "caption_summarization")
+            content_blocks = []
+            if self.endless_ai_enabled:
+                # Add image blocks if any are present
+                images = inputs.get("images", [])
+                model_name = self.get_param("llm", "model")
 
-            # Add image blocks if any are present
-            images = inputs.get("images", [])
-            if images:
-                content_blocks += [
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images
-                ]
+                content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
-            return [SystemMessage(content=self.get_param("prompts", "caption_summarization")), HumanMessage(content=content_blocks)]
+            # Add the user question after the images (if any)
+            if inputs["input"] and inputs["input"].strip():
+                content_blocks.append({"type": "text", "text": inputs["input"]})
+
+            return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
 
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [
@@ -108,7 +111,7 @@ class BatchSummarization(Function):
             else DEFAULT_SUMM_RECURSION_LIMIT
         )
 
-        self.endless_ai_enabled = self.get_param("endless_ai_enabled")
+        self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
         logger.info(f"Batch endless_ai_enabled value: {self.endless_ai_enabled}")
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
@@ -117,10 +120,7 @@ class BatchSummarization(Function):
 
     def _get_appropriate_callback(self):
         """Get the appropriate callback based on the LLM being used"""
-        # Get the LLM from the pipeline
-        llm_tool = self.get_tool(LLM_TOOL_NAME)
-        model_name = getattr(llm_tool.llm, 'model_id', '') or getattr(llm_tool.llm, 'model', '')
-        
+        model_name = self.get_param("llm", "model")
         if is_claude_model(model_name):
             return get_bedrock_anthropic_callback()
         else:
@@ -165,18 +165,18 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
-                    batch_list = batch.as_list()
-                    logger.info(f"CA-RAG BATCH DEBUG: Processing batch {batch._batch_index}")
-                    logger.info(f"CA-RAG BATCH DEBUG: Batch size: {len(batch_list)} documents")
-                    total_text = " ".join([doc for doc, _, _ in batch_list])
-                    logger.info(f"CA-RAG BATCH DEBUG: Total text length: {len(total_text)} characters")
-                    logger.info(f"CA-RAG BATCH DEBUG: Number of images: {len(images)}")
-                    logger.info(f"CA-RAG BATCH DEBUG: Text preview: {total_text[:300]}...")
-                    for i, (doc, doc_i, doc_meta) in enumerate(batch_list):
-                        logger.info(f"CA-RAG BATCH DEBUG: Doc {i+1}: {len(doc)} chars, doc_i={doc_i}")
-                    batch_summary = await call_token_safe(
-                        {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
-                    )
+                    if len(batch.as_list()) > 1 or len(images) > 0:
+                        batch_summary = await call_token_safe(
+                            {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                        )
+                    else:
+                        doc, _, _ = batch.as_list()[0]
+                        if doc.strip() == ".":
+                            batch_summary = "Video Analysis completed."
+                        else:
+                            batch_summary = await call_token_safe(
+                                {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                            )
             except Exception as e:
                 logger.error(
                     f"Error summarizing batch {batch._batch_index}: {e}"
@@ -363,13 +363,12 @@ class BatchSummarization(Function):
                             )
                 doc_meta["batch_i"] = doc_i // self.batch_size
 
-
                 # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
-                if self.endless_ai_enabled:
+                #if self.endless_ai_enabled and doc != ".":
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
                     # Annoying, because the vlm spent time on it, but we do get better results this way - probably because the analysis is done using the grid images without the vlm results affecting it
-                    doc = ""
+                #    doc = ""
 
                 batch = self.batcher.add_doc(doc, doc_i, doc_meta)
                 if batch.is_full():
