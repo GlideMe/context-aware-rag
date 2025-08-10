@@ -35,7 +35,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from vss_ctx_rag.utils.ctx_rag_logger import TimeMeasure, logger
 from vss_ctx_rag.utils.utils import remove_think_tags, remove_lucene_chars
-from vss_ctx_rag.utils.common_utils import is_claude_model
 from vss_ctx_rag.functions.rag.graph_rag.constants import (
     CHAT_SEARCH_KWARG_SCORE_THRESHOLD,
     QUESTION_TRANSFORM_TEMPLATE,
@@ -71,7 +70,7 @@ class GraphRetrieval:
             [
                 (
                     "system",
-                    "Summarize the above chat messages into a concise message, \
+                    "Summarize the below chat messages into a concise message, \
                     focusing on key points and relevant details that could be useful for future conversations. \
                     Exclude all introductions and extraneous information.",
                 ),

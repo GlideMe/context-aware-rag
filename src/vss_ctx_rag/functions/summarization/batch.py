@@ -169,8 +169,8 @@ class BatchSummarization(Function):
                             {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
                         )
                     else:
-                        doc, _, _ = batch.as_list()[0]
-                        if doc.strip() == ".":
+                        doc, _, doc_meta = batch.as_list()[0]
+                        if doc.strip() == "." and doc_meta.get("is_last", False)::
                             batch_summary = "Video Analysis completed."
                         else:
                             batch_summary = await call_token_safe(
