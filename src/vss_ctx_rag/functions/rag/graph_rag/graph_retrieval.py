@@ -68,13 +68,13 @@ class GraphRetrieval:
         self.multi_channel = multi_channel
         summarization_prompt = ChatPromptTemplate.from_messages(
             [
-                MessagesPlaceholder(variable_name="chat_history"),
                 (
                     "system",
-                    "Summarize the above chat messages into a concise message, \
+                    "Summarize the below chat messages into a concise message, \
                     focusing on key points and relevant details that could be useful for future conversations. \
                     Exclude all introductions and extraneous information.",
                 ),
+                MessagesPlaceholder(variable_name="chat_history"),
             ]
         )
         self.chat_history_summarization_chain = summarization_prompt | llm
@@ -99,7 +99,7 @@ class GraphRetrieval:
             if self.endless_ai_enabled:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-                # logger.info(f"Length of {len(images)} images={sum(len(img) for img in images)}")
+
                 content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             messages.append(HumanMessage(content=content_blocks))
