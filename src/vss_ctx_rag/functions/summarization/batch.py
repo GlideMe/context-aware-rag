@@ -170,7 +170,7 @@ class BatchSummarization(Function):
                         )
                     else:
                         doc, _, doc_meta = batch.as_list()[0]
-                        if doc.strip() == "." and doc_meta.get("is_last", False)::
+                        if doc.strip() == "." and doc_meta.get("is_last", False):
                             batch_summary = "Video Analysis completed."
                         else:
                             batch_summary = await call_token_safe(
