@@ -18,7 +18,7 @@ import time
 from typing import Optional, Iterator, Dict, Any, List
 
 try:
-    from vss_ctx_rag.utils.gemini_optimizer import gemini_optimizer, UseCaseType
+    from langchain_google_genai import ChatGoogleGenerativeAI
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -251,10 +251,7 @@ class ChatClaudeTool(LLMTool):
 
 
 class GeminiLLM(BaseChatModel):
-    """Direct Google API implementation for Gemini models"""
-    
-class GeminiLLM(BaseChatModel):
-    """Direct Google API implementation for Gemini models"""
+    """Langchain wrapper for Google Gemini models using ChatGoogleGenerativeAI"""
     
     # Pydantic field declarations - NO hardcoded defaults
     model_name: str
@@ -262,6 +259,7 @@ class GeminiLLM(BaseChatModel):
     max_tokens: int
     temperature: float
     top_p: float
+    _client: Optional[ChatGoogleGenerativeAI] = None
     
     def __init__(self, model_name: str, api_key: str, **kwargs):
         # Extract config values with fallback defaults
@@ -280,77 +278,61 @@ class GeminiLLM(BaseChatModel):
         )
         if not GEMINI_AVAILABLE:
             raise ImportError(
-                "Gemini optimizer is not available. "
-                "Check gemini_optimizer.py import"
+                "langchain_google_genai is not available. "
+                "Install with: pip install langchain_google_genai"
             )
+        
+        # Initialize the langchain client
+        self._client = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temperature,
+            max_output_tokens=max_tokens
+            # Note: top_p not directly supported
+        )
         
         logger.info(f"Initialized Gemini LLM for model: {model_name}")
     
-    def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> Dict[str, Any]:
-        """Convert LangChain messages to Gemini format with proper system message handling"""
-        formatted_messages = []
-        system_message = None
+    def _prepare_messages(self, messages: List[BaseMessage]) -> List[BaseMessage]:
+        """Prepare messages for ChatGoogleGenerativeAI with system message handling"""
+        prepared_messages = []
+        system_content = None
         
-        # First pass: extract system message
+        # Extract system message
         for msg in messages:
             if isinstance(msg, SystemMessage):
-                system_message = str(msg.content)
+                system_content = str(msg.content)
                 break
         
-        # Second pass: format user/assistant messages
+        # Process other messages
         for msg in messages:
             if isinstance(msg, HumanMessage):
                 content = str(msg.content)
-                # If we have a system message and this is the first user message, prepend it
-                if system_message and len(formatted_messages) == 0:
-                    content = f"{system_message}\n\n{content}"
-                    system_message = None  # Clear it so we don't add it again
-                
-                formatted_messages.append({
-                    "role": "user",
-                    "parts": [{"text": content}]
-                })
+                # Prepend system message to first user message
+                if system_content and len(prepared_messages) == 0:
+                    content = f"{system_content}\n\n{content}"
+                    system_content = None
+                prepared_messages.append(HumanMessage(content=content))
             elif isinstance(msg, AIMessage):
-                formatted_messages.append({
-                    "role": "model",
-                    "parts": [{"text": str(msg.content)}]
-                })
+                prepared_messages.append(AIMessage(content=str(msg.content)))
         
-        return {
-            "contents": formatted_messages,
-            "generationConfig": {
-                "maxOutputTokens": self.max_tokens,
-                "temperature": self.temperature,
-                "topP": self.top_p,
-            }
-        }
+        return prepared_messages
     
     def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
-        """Generate a single response using Gemini API"""
+        """Generate a single response using ChatGoogleGenerativeAI"""
         try:
-            # Format messages for Gemini
-            request_data = self._format_messages_for_gemini(messages)
+            # Prepare messages for ChatGoogleGenerativeAI
+            prepared_messages = self._prepare_messages(messages)
             
-            # Extract messages from request_data for optimizer
-            formatted_messages = request_data.get("contents", [])
-            messages_for_optimizer = []
-            for msg in formatted_messages:
-                if msg.get("role") == "user":
-                    messages_for_optimizer.append({"role": "user", "content": msg["parts"][0]["text"]})
-                elif msg.get("role") == "model":
-                    messages_for_optimizer.append({"role": "assistant", "content": msg["parts"][0]["text"]})
+            # Update client configuration with current parameters
+            self._client.temperature = self.temperature
+            self._client.max_output_tokens = self.max_tokens
             
-            # Call Gemini through optimizer
-            response = gemini_optimizer.generate_response(
-                messages=messages_for_optimizer,
-                use_case=UseCaseType.GENERAL
-            )
+            # Call ChatGoogleGenerativeAI directly
+            response = self._client.invoke(prepared_messages)
             
-            # Extract content from optimizer response
-            content = response.get("content", "")
-            
-            # Create ChatGeneration
-            generation = ChatGeneration(message=AIMessage(content=content))
+            # Create ChatGeneration from response
+            generation = ChatGeneration(message=response)
             
             return ChatResult(generations=[generation])
             
@@ -359,11 +341,22 @@ class GeminiLLM(BaseChatModel):
             raise
 
     def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
-        """Stream response from Gemini (simplified - yields single response)"""
-        # For now, just return the full response
-        # Full streaming would require separate streaming implementation
-        result = self._generate(messages, stop, **kwargs)
-        yield result.generations[0]
+        """Stream response from ChatGoogleGenerativeAI"""
+        try:
+            # Prepare messages
+            prepared_messages = self._prepare_messages(messages)
+            
+            # Update client configuration
+            self._client.temperature = self.temperature
+            self._client.max_output_tokens = self.max_tokens
+            
+            # Use streaming if available
+            for chunk in self._client.stream(prepared_messages):
+                yield ChatGeneration(message=chunk)
+        except Exception:
+            # Fallback to non-streaming
+            result = self._generate(messages, stop, **kwargs)
+            yield result.generations[0]
     
     @property
     def _llm_type(self) -> str:
@@ -374,8 +367,8 @@ class ChatGeminiTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
         if not GEMINI_AVAILABLE:
             raise ImportError(
-                "Gemini optimizer is not available. "
-                "Check gemini_optimizer.py import"
+                "langchain_google_genai is not available. "
+                "Install with: pip install langchain_google_genai"
             )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
@@ -389,23 +382,24 @@ class ChatGeminiTool(LLMTool):
                 "or pass api_key parameter."
             )
         
-        # Extract parameters for our custom LLM
+        # Extract parameters for ChatGoogleGenerativeAI
         max_tokens = llm_params.get("max_tokens", 4096)
         temperature = llm_params.get("temperature", 0.1)
         top_p = llm_params.get("top_p", 0.9)
         
-        logger.info(f"Initializing Gemini client for model: {model_name}")
+        logger.info(f"Initializing ChatGoogleGenerativeAI for model: {model_name}")
         
-        # Create our custom Gemini LLM
-        gemini_llm = GeminiLLM(
-            model_name=model_name,
-            api_key=api_key
+        # Create ChatGoogleGenerativeAI directly instead of custom wrapper
+        gemini_llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temperature,
+            max_output_tokens=max_tokens
+            # Note: top_p not directly supported in langchain_google_genai
+        ).configurable_fields(
+            temperature=ConfigurableField(id="temperature"),
+            max_output_tokens=ConfigurableField(id="max_tokens")
         )
-        
-        # Set initial parameters
-        gemini_llm.max_tokens = max_tokens
-        gemini_llm.temperature = temperature
-        gemini_llm.top_p = top_p
         
         super().__init__(
             llm=gemini_llm,
@@ -445,19 +439,23 @@ class ChatGeminiTool(LLMTool):
 
     def update(self, top_p=None, temperature=None, max_tokens=None):
         """Update Gemini model configuration with validation and optimization."""
+        configurable_dict = {}
         
         # Validate and optimize parameters for Gemini 2.5
-        if top_p is not None:
-            top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
-            self.llm.top_p = top_p
-            
         if temperature is not None:
             temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
-            self.llm.temperature = temperature
+            configurable_dict['temperature'] = temperature
             
         if max_tokens is not None:
             # Optimize for Gemini 2.5's capabilities
             max_tokens = max(1, min(32768, int(max_tokens)))  # Clamp to model limits
-            self.llm.max_tokens = max_tokens
+            configurable_dict['max_tokens'] = max_tokens
         
-        logger.debug(f"Updated Gemini LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
+        # Note: top_p is not configurable in ChatGoogleGenerativeAI
+        if top_p is not None:
+            logger.warning("top_p parameter is not supported by ChatGoogleGenerativeAI")
+        
+        # Update the LLM configuration
+        if configurable_dict:
+            self.llm = self.llm.with_config(configurable=configurable_dict)
+            logger.debug(f"Updated Gemini LLM configuration: {configurable_dict}")
