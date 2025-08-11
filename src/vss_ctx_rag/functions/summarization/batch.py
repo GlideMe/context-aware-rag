@@ -183,7 +183,7 @@ class BatchSummarization(Function):
                 batch_summary = "."
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
-            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
+            logger.info("Batch %d summary: %s", batch, batch_summary) #TODO: Revert log
             logger.info(
                 "Total Tokens: %s, "
                 "Prompt Tokens: %s, "
