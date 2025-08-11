@@ -171,9 +171,7 @@ class ContextManagerHandler:
             config: System configuration dictionary
             req_info: Optional request-specific information
         """
-        logger.info(
-            f"^elad^ Configuring init for {self._process_index} with config: {config}"
-        )
+        
         # Init time Milvus DB config
         chat_config = copy.deepcopy(config.get("chat"))
         summ_config = copy.deepcopy(config.get("summarization"))

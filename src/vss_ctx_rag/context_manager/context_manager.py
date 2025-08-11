@@ -296,7 +296,6 @@ class ContextManager:
             raise
         self._process_index = process_index
         logger.debug(f"Initializing Context Manager index: {self._process_index}")
-        logger.info(f"^elad^ init with {config}, req={req_info}")
         try:
             self.process = ContextManagerProcess(config, self._process_index, req_info)
             self.process.start()
