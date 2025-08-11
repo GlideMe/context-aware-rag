@@ -208,8 +208,6 @@ class BatchSummarization(Function):
                 "doc_type": "caption_summary",
             }
 
-            logger.info(f"^elad: {batch_meta}")
-
             # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
             # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
             self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
