@@ -41,3 +41,18 @@ def is_claude_model(model_name: str) -> bool:
     )
 
     return any(model.startswith(prefix) for prefix in claude_prefixes)
+
+
+def is_gemini_model(model_name: str) -> bool:
+    """Return True if the model name refers to a Google Gemini model."""
+
+    model = model_name.lower()
+
+    gemini_prefixes = (
+        "gemini",
+        "gemini-",
+        "models/gemini",
+        "google/gemini",
+    )
+
+    return any(model.startswith(prefix) for prefix in gemini_prefixes)
