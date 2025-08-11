@@ -129,6 +129,8 @@ class BatchSummarization(Function):
         else:
             return get_openai_callback()
 
+    # vss_ctx_rag/batch.py
+
     async def _process_full_batch(self, batch):
         """Process a full batch, with special handling for long Gemini inputs."""
         with TimeMeasure(
@@ -147,14 +149,8 @@ class BatchSummarization(Function):
             )
             try:
                 with self._get_appropriate_callback() as cb:
-                    
-                    # --- NEW: Conditional logic for Gemini vs. other models ---
-                    
-                    # Prepare the full input text from all documents in the batch
                     full_input_text = " ".join([doc for doc, _, _ in batch.as_list()])
                     model_name = self.get_param("llm", "model")
-                    
-                    # Define a safe character limit for Gemini based on our log analysis
                     GEMINI_INPUT_LIMIT = 850
 
                     if self.endless_ai_enabled:
@@ -171,39 +167,33 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
-                    # Check if we are using a Gemini model AND if the input is too long
                     if is_gemini_model(model_name) and len(full_input_text) > GEMINI_INPUT_LIMIT:
-                        
                         logger.warning(f"Gemini input length ({len(full_input_text)} chars) exceeds safe limit. Splitting text to avoid silent failure.")
 
-                        # 1. MAP STEP: Split the long text into smaller chunks
+                        # --- FIX START ---
+                        # 1. MAP STEP: Split the long text and summarize each chunk.
                         text_splitter = RecursiveCharacterTextSplitter(chunk_size=GEMINI_INPUT_LIMIT, chunk_overlap=50)
                         text_chunks = text_splitter.split_text(full_input_text)
                         
                         summaries = []
                         for chunk in text_chunks:
-                            # Summarize each smaller chunk individually
                             chunk_summary = await call_token_safe(
-                                {"input": chunk, "images": []}, # Process text chunks without images
+                                {"input": chunk, "images": []},
                                 self.batch_pipeline, 
                                 self.recursion_limit,
                             )
                             if chunk_summary and chunk_summary.strip():
                                 summaries.append(chunk_summary)
                         
-                        # 2. REDUCE STEP: Combine the individual summaries
+                        # 2. REDUCE STEP: Simply join the summaries. DO NOT call the LLM again here.
                         if not summaries:
-                            logger.error(f"All split-chunk summaries for batch {batch._batch_index} were empty. Resulting in an empty final summary.")
-                            batch_summary = "" # Default to empty if all chunks fail
+                            logger.error(f"All split-chunk summaries for batch {batch._batch_index} were empty.")
+                            batch_summary = ""
                         else:
-                            combined_summaries = "\n".join(summaries)
-                            logger.info(f"Aggregating {len(summaries)} chunk summaries for final output.")
-                            # Use the aggregation pipeline to create a single, final summary
-                            batch_summary = await call_token_safe(
-                                {"input": combined_summaries},
-                                self.aggregation_pipeline,
-                                self.recursion_limit,
-                            )
+                            logger.info(f"Joining {len(summaries)} chunk summaries for batch {batch._batch_index}.")
+                            batch_summary = "\n".join(summaries)
+                        # --- FIX END ---
+                            
                     else:
                         # --- ORIGINAL LOGIC: For other models or short Gemini inputs ---
                         if len(batch.as_list()) > 1 or len(images) > 0:
@@ -220,29 +210,20 @@ class BatchSummarization(Function):
                                 )
 
             except Exception as e:
-                logger.error(
-                    f"Error summarizing batch {batch._batch_index}: {e}"
-                )
+                logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
                 batch_summary = "."
+            
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
             logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
             logger.info(
-                "Total Tokens: %s, "
-                "Prompt Tokens: %s, "
-                "Completion Tokens: %s, "
-                "Successful Requests: %s, "
-                "Total Cost (USD): $%s"
+                "Total Tokens: %s, Prompt Tokens: %s, Completion Tokens: %s, Successful Requests: %s, Total Cost (USD): $%s"
                 % (
-                    cb.total_tokens,
-                    cb.prompt_tokens,
-                    cb.completion_tokens,
-                    cb.successful_requests,
-                    cb.total_cost,
+                    cb.total_tokens, cb.prompt_tokens, cb.completion_tokens,
+                    cb.successful_requests, cb.total_cost,
                 ),
             )
         try:
-            # Get metadata from the last document in the batch
             batch_list = batch.as_list()
             last_doc_meta = batch_list[-1][2] if batch_list else {}
             batch_meta = {
@@ -250,9 +231,6 @@ class BatchSummarization(Function):
                 "batch_i": batch._batch_index,
                 "doc_type": "caption_summary",
             }
-
-            # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
-            # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
             self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
         except Exception as e:
             logger.error(e)
