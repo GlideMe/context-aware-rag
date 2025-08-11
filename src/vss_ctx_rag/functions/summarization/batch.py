@@ -183,7 +183,7 @@ class BatchSummarization(Function):
                 batch_summary = "."
             self.metrics.summary_tokens += cb.total_tokens
             self.metrics.summary_requests += cb.successful_requests
-            logger.info("Batch %d summary: %s", batch.__str__, batch_summary) #TODO: Revert log
+            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary) #TODO: Revert log
             logger.info(
                 "Total Tokens: %s, "
                 "Prompt Tokens: %s, "
@@ -207,6 +207,8 @@ class BatchSummarization(Function):
                 "batch_i": batch._batch_index,
                 "doc_type": "caption_summary",
             }
+
+            logger.info(f"^elad: {batch_meta}")
 
             # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
             # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
