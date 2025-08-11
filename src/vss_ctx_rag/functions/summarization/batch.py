@@ -67,17 +67,62 @@ class BatchSummarization(Function):
             system_prompt = self.get_param("prompts", "caption_summarization")
             content_blocks = []
             if self.endless_ai_enabled:
-                # Add image blocks if any are present
                 images = inputs.get("images", [])
-
                 content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
-
-            # Add the user question after the images (if any)
             if inputs["input"] and inputs["input"].strip():
                 content_blocks.append({"type": "text", "text": inputs["input"]})
-
             return [SystemMessage(content=system_prompt), HumanMessage(content=content_blocks)]
-
+        self.aggregation_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.get_param("prompts", "summary_aggregation")),
+                ("user", "{input}"),
+            ]
+        )
+        self.output_parser = StrOutputParser()
+        self.batch_pipeline = (
+            RunnableLambda(prepare_messages)
+            | self.get_tool(LLM_TOOL_NAME)
+            | self.output_parser
+            | remove_think_tags
+        )
+        self.aggregation_pipeline = (
+            self.aggregation_prompt
+            | self.get_tool(LLM_TOOL_NAME)
+            | self.output_parser
+            | remove_think_tags
+        )
+        # --- NEW LOGIC START ---
+        # A simpler pipeline for summarizing fragmented text to avoid confusing the LLM.
+        simple_summary_prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert at summarizing text concisely. Do not add any conversational fluff. Directly summarize the user's text."),
+            ("user", "Please provide a concise summary of the following event descriptions:\n\n{input}")
+        ])
+        self.simple_summary_pipeline = (
+            simple_summary_prompt
+            | self.get_tool(LLM_TOOL_NAME)
+            | self.output_parser
+            | remove_think_tags
+        )
+        # --- NEW LOGIC END ---
+        self.batch_size = self.get_param("params", "batch_size")
+        self.vector_db = self.get_tool("vector_db")
+        self.timeout = (
+            self.get_param("timeout_sec", required=False)
+            if self.get_param("timeout_sec", required=False)
+            else self.timeout
+        )
+        self.curr_batch_i = 0
+        self.batcher = Batcher(self.batch_size)
+        self.recursion_limit = (
+            self.get_param("summ_rec_lim", required=False)
+            if self.get_param("summ_rec_lim", required=False)
+            else DEFAULT_SUMM_RECURSION_LIMIT
+        )
+        self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
+        logger.info(f"Batch endless_ai_enabled value: {self.endless_ai_enabled}")
+        self.log_dir = os.environ.get("VIA_LOG_DIR", None)
+        self.summary_start_time = None
+        self.enable_summary = True
         self.aggregation_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.get_param("prompts", "summary_aggregation")),
@@ -104,7 +149,6 @@ class BatchSummarization(Function):
             if self.get_param("timeout_sec", required=False)
             else self.timeout
         )
-
         # working params
         self.curr_batch_i = 0
         self.batcher = Batcher(self.batch_size)
@@ -113,10 +157,8 @@ class BatchSummarization(Function):
             if self.get_param("summ_rec_lim", required=False)
             else DEFAULT_SUMM_RECURSION_LIMIT
         )
-
         self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
         logger.info(f"Batch endless_ai_enabled value: {self.endless_ai_enabled}")
-
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
         self.summary_start_time = None
         self.enable_summary = True
@@ -132,108 +174,104 @@ class BatchSummarization(Function):
     # vss_ctx_rag/batch.py
 
     async def _process_full_batch(self, batch):
-        """Process a full batch, with special handling for long Gemini inputs."""
-        with TimeMeasure(
-            "Batch "
-            + str(batch._batch_index)
-            + " Summary IS LAST "
-            + str(
-                any(
-                    doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
+            """Process a full batch, with special handling for long Gemini inputs."""
+            with TimeMeasure(
+                "Batch "
+                + str(batch._batch_index)
+                + " Summary IS LAST "
+                + str(
+                    any(
+                        doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
+                    )
+                ),
+                "pink",
+            ):
+                logger.info(
+                    "Batch %d is full. Processing ...", batch._batch_index
                 )
-            ),
-            "pink",
-        ):
-            logger.info(
-                "Batch %d is full. Processing ...", batch._batch_index
-            )
-            try:
-                with self._get_appropriate_callback() as cb:
-                    full_input_text = " ".join([doc for doc, _, _ in batch.as_list()])
-                    model_name = self.get_param("llm", "model")
-                    GEMINI_INPUT_LIMIT = 850
+                try:
+                    with self._get_appropriate_callback() as cb:
+                        full_input_text = " ".join([doc for doc, _, _ in batch.as_list()])
+                        model_name = self.get_param("llm", "model")
+                        GEMINI_INPUT_LIMIT = 850
 
-                    if self.endless_ai_enabled:
-                        def image_file_to_base64(filepath):
-                            with open(filepath, 'rb') as image_file:
-                                image_data = image_file.read()
-                            return base64.b64encode(image_data).decode('utf-8')
+                        if self.endless_ai_enabled:
+                            def image_file_to_base64(filepath):
+                                with open(filepath, 'rb') as image_file:
+                                    image_data = image_file.read()
+                                return base64.b64encode(image_data).decode('utf-8')
 
-                        unique_images = set()
-                        for doc, doc_i, doc_meta in batch.as_list():
-                            if doc_meta.get("grid_filenames"):
-                                unique_images.update(doc_meta["grid_filenames"].split('|'))
-                        images = [image_file_to_base64(img) for img in list(unique_images)]
-                    else:
-                        images = []
-
-                    if is_gemini_model(model_name) and len(full_input_text) > GEMINI_INPUT_LIMIT:
-                        logger.warning(f"Gemini input length ({len(full_input_text)} chars) exceeds safe limit. Splitting text to avoid silent failure.")
-
-                        # --- FIX START ---
-                        # 1. MAP STEP: Split the long text and summarize each chunk.
-                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=GEMINI_INPUT_LIMIT, chunk_overlap=50)
-                        text_chunks = text_splitter.split_text(full_input_text)
-                        
-                        summaries = []
-                        for chunk in text_chunks:
-                            chunk_summary = await call_token_safe(
-                                {"input": chunk, "images": []},
-                                self.batch_pipeline, 
-                                self.recursion_limit,
-                            )
-                            if chunk_summary and chunk_summary.strip():
-                                summaries.append(chunk_summary)
-                        
-                        # 2. REDUCE STEP: Simply join the summaries. DO NOT call the LLM again here.
-                        if not summaries:
-                            logger.error(f"All split-chunk summaries for batch {batch._batch_index} were empty.")
-                            batch_summary = ""
+                            unique_images = set()
+                            for doc, doc_i, doc_meta in batch.as_list():
+                                if doc_meta.get("grid_filenames"):
+                                    unique_images.update(doc_meta["grid_filenames"].split('|'))
+                            images = [image_file_to_base64(img) for img in list(unique_images)]
                         else:
-                            logger.info(f"Joining {len(summaries)} chunk summaries for batch {batch._batch_index}.")
-                            batch_summary = "\n".join(summaries)
-                        # --- FIX END ---
+                            images = []
+
+                        if is_gemini_model(model_name) and len(full_input_text) > GEMINI_INPUT_LIMIT:
+                            logger.warning(f"Gemini input length ({len(full_input_text)} chars) exceeds safe limit. Splitting text to avoid silent failure.")
+
+                            text_splitter = RecursiveCharacterTextSplitter(chunk_size=GEMINI_INPUT_LIMIT, chunk_overlap=50)
+                            text_chunks = text_splitter.split_text(full_input_text)
                             
-                    else:
-                        # --- ORIGINAL LOGIC: For other models or short Gemini inputs ---
-                        if len(batch.as_list()) > 1 or len(images) > 0:
-                            batch_summary = await call_token_safe(
-                                {"input": full_input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
-                            )
-                        else:
-                            doc, _, doc_meta = batch.as_list()[0]
-                            if doc.strip() == "." and doc_meta.get("is_last", False):
-                                batch_summary = "Video Analysis completed."
+                            summaries = []
+                            for chunk in text_chunks:
+                                # Use the new, simple pipeline for the fragments
+                                chunk_summary = await call_token_safe(
+                                    {"input": chunk},
+                                    self.simple_summary_pipeline, 
+                                    self.recursion_limit,
+                                )
+                                if chunk_summary and chunk_summary.strip():
+                                    summaries.append(chunk_summary)
+                            
+                            if not summaries:
+                                logger.error(f"All split-chunk summaries for batch {batch._batch_index} were empty.")
+                                batch_summary = ""
                             else:
+                                logger.info(f"Joining {len(summaries)} chunk summaries for batch {batch._batch_index}.")
+                                batch_summary = "\n".join(summaries)
+                                
+                        else:
+                            if len(batch.as_list()) > 1 or len(images) > 0:
                                 batch_summary = await call_token_safe(
                                     {"input": full_input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
                                 )
+                            else:
+                                doc, _, doc_meta = batch.as_list()[0]
+                                if doc.strip() == "." and doc_meta.get("is_last", False):
+                                    batch_summary = "Video Analysis completed."
+                                else:
+                                    batch_summary = await call_token_safe(
+                                        {"input": full_input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
+                                    )
 
+                except Exception as e:
+                    logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
+                    batch_summary = "."
+                
+                self.metrics.summary_tokens += cb.total_tokens
+                self.metrics.summary_requests += cb.successful_requests
+                logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
+                logger.info(
+                    "Total Tokens: %s, Prompt Tokens: %s, Completion Tokens: %s, Successful Requests: %s, Total Cost (USD): $%s"
+                    % (
+                        cb.total_tokens, cb.prompt_tokens, cb.completion_tokens,
+                        cb.successful_requests, cb.total_cost,
+                    ),
+                )
+            try:
+                batch_list = batch.as_list()
+                last_doc_meta = batch_list[-1][2] if batch_list else {}
+                batch_meta = {
+                    **last_doc_meta,
+                    "batch_i": batch._batch_index,
+                    "doc_type": "caption_summary",
+                }
+                self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
             except Exception as e:
-                logger.error(f"Error summarizing batch {batch._batch_index}: {e}")
-                batch_summary = "."
-            
-            self.metrics.summary_tokens += cb.total_tokens
-            self.metrics.summary_requests += cb.successful_requests
-            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
-            logger.info(
-                "Total Tokens: %s, Prompt Tokens: %s, Completion Tokens: %s, Successful Requests: %s, Total Cost (USD): $%s"
-                % (
-                    cb.total_tokens, cb.prompt_tokens, cb.completion_tokens,
-                    cb.successful_requests, cb.total_cost,
-                ),
-            )
-        try:
-            batch_list = batch.as_list()
-            last_doc_meta = batch_list[-1][2] if batch_list else {}
-            batch_meta = {
-                **last_doc_meta,
-                "batch_i": batch._batch_index,
-                "doc_type": "caption_summary",
-            }
-            self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
-        except Exception as e:
-            logger.error(e)
+                logger.error(e)
 
     async def acall(self, state: dict):
         """batch summarization function call
