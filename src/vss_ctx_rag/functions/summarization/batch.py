@@ -263,10 +263,8 @@ class BatchSummarization(Function):
                 logger.info(f"Current batch index: {self.curr_batch_i}")
                 target_end_batch_index = self.curr_batch_i
 
-            # Track fetched batch indices
             fetched_batch_indices = set()
             while time.time() < stop_time:
-                # Only query for unfetched batches
                 unfetched_indices = [
                     i
                     for i in range(target_start_batch_index, target_end_batch_index + 1)
@@ -275,18 +273,15 @@ class BatchSummarization(Function):
                 if not unfetched_indices:
                     break
 
-                # Query only for new batches
                 batch_filter = f"doc_type == 'caption_summary' and batch_i in [{','.join(map(str, unfetched_indices))}]"
                 new_batches = await self.vector_db.aget_text_data(
                     fields=["text", "batch_i"], filter=batch_filter
                 )
 
-                # Update fetched indices and add to results
                 for batch in new_batches:
                     fetched_batch_indices.add(batch["batch_i"])
                 batches.extend(new_batches)
 
-                # If we have all required batches, break
                 if len(fetched_batch_indices) == (
                     target_end_batch_index - target_start_batch_index + 1
                 ):
@@ -305,7 +300,6 @@ class BatchSummarization(Function):
                     await asyncio.sleep(1)
                     continue
 
-            # Sort batches by batch_i field
             batches.sort(key=lambda x: x["batch_i"])
             logger.info(f"Number of Batches Fetched: {len(batches)}")
 
@@ -314,143 +308,43 @@ class BatchSummarization(Function):
                 state["error_code"] = "No batch summaries found"
                 logger.error("No batch summaries found")
             elif len(batches) > 0:
-                with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
-                    with self._get_appropriate_callback() as cb:
-                        
-                        # Join the summaries into a single string to create a clean input.
-                        final_input_text = "\n".join([batch['text'] for batch in batches if batch['text']])
+                
+                # --- FINAL FIX START ---
+                model_name = self.get_param("llm", "model")
 
-                        result = await call_token_safe(
-                            final_input_text,  # Pass the correctly formatted string
-                            self.aggregation_pipeline,
-                            self.recursion_limit,
-                        )
-
-                        state["result"] = result
-                    logger.info("Summary Aggregation Done")
-                    self.metrics.aggregation_tokens = cb.total_tokens
-                    logger.info(
-                        "Total Tokens: %s, "
-                        "Prompt Tokens: %s, "
-                        "Completion Tokens: %s, "
-                        "Successful Requests: %s, "
-                        "Total Cost (USD): $%s"
-                        % (
-                            cb.total_tokens,
-                            cb.prompt_tokens,
-                            cb.completion_tokens,
-                            cb.successful_requests,
-                            cb.total_cost,
-                        ),
-                    )
-                self.metrics.aggregation_latency = bas.execution_time
-        if self.log_dir:
-            log_path = Path(self.log_dir).joinpath("summary_metrics.json")
-            self.metrics.dump_json(log_path.absolute())
-        return state
-        """batch summarization function call
-
-        Args:
-            state (dict): should validate against call_schema
-        Returns:
-            dict: the state dict will contain result:
-            {
-                # ...
-                # The following key is overwritten or added
-                "result" : "summary",
-                "error_code": "Error String" # Optional
-            }
-        """
-        with TimeMeasure("OffBatchSumm/Acall", "blue"):
-            batches = []
-            self.call_schema.validate(state)
-            stop_time = time.time() + self.timeout
-            target_start_batch_index = self.batcher.get_batch_index(
-                state["start_index"]
-            )
-            target_end_batch_index = self.batcher.get_batch_index(state["end_index"])
-            logger.info(f"Target Batch Start: {target_start_batch_index}")
-            logger.info(f"Target Batch End: {target_end_batch_index}")
-            if target_end_batch_index == -1:
-                logger.info(f"Current batch index: {self.curr_batch_i}")
-                target_end_batch_index = self.curr_batch_i
-
-            # Track fetched batch indices
-            fetched_batch_indices = set()
-            while time.time() < stop_time:
-                # Only query for unfetched batches
-                unfetched_indices = [
-                    i
-                    for i in range(target_start_batch_index, target_end_batch_index + 1)
-                    if i not in fetched_batch_indices
-                ]
-                if not unfetched_indices:
-                    break
-
-                # Query only for new batches
-                batch_filter = f"doc_type == 'caption_summary' and batch_i in [{','.join(map(str, unfetched_indices))}]"
-                new_batches = await self.vector_db.aget_text_data(
-                    fields=["text", "batch_i"], filter=batch_filter
-                )
-
-                # Update fetched indices and add to results
-                for batch in new_batches:
-                    fetched_batch_indices.add(batch["batch_i"])
-                batches.extend(new_batches)
-
-                # If we have all required batches, break
-                if len(fetched_batch_indices) == (
-                    target_end_batch_index - target_start_batch_index + 1
-                ):
-                    logger.info(
-                        f"All {len(fetched_batch_indices)} batches fetched. Moving forward."
-                    )
-                    break
+                # For Gemini, we skip the final aggregation LLM call to avoid the silent failure.
+                # We will return the joined batch summaries directly as the final report.
+                if is_gemini_model(model_name):
+                    logger.info("Gemini model detected. Joining batch summaries directly to create final report.")
+                    # Join with a clear separator for readability.
+                    final_summary = "\n\n---\n\n".join([batch['text'] for batch in batches if batch.get('text', '').strip()])
+                    state["result"] = final_summary
+                    logger.info("Summary Aggregation Done (by joining).")
+                    
                 else:
-                    remaining = (
-                        target_end_batch_index
-                        - target_start_batch_index
-                        + 1
-                        - len(fetched_batch_indices)
-                    )
-                    logger.info(f"Need {remaining} more batches. Waiting...")
-                    await asyncio.sleep(1)
-                    continue
-
-            # Sort batches by batch_i field
-            batches.sort(key=lambda x: x["batch_i"])
-            logger.info(f"Number of Batches Fetched: {len(batches)}")
-
-            if len(batches) == 0:
-                state["result"] = ""
-                state["error_code"] = "No batch summaries found"
-                logger.error("No batch summaries found")
-            elif len(batches) > 0:
-                with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
-                    with self._get_appropriate_callback() as cb:
-                        result = await call_token_safe(
-                            batches,
-                            self.aggregation_pipeline,
-                            self.recursion_limit,
+                    # For all other models, use the original, correct aggregation logic.
+                    with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
+                        with self._get_appropriate_callback() as cb:
+                            final_input_text = "\n".join([batch['text'] for batch in batches if batch.get('text', '').strip()])
+                            
+                            result = await call_token_safe(
+                                final_input_text,
+                                self.aggregation_pipeline,
+                                self.recursion_limit,
+                            )
+                            state["result"] = result
+                        logger.info("Summary Aggregation Done (by LLM).")
+                        self.metrics.aggregation_tokens = cb.total_tokens
+                        logger.info(
+                            "Total Tokens: %s, Prompt Tokens: %s, Completion Tokens: %s, Successful Requests: %s, Total Cost (USD): $%s"
+                            % (
+                                cb.total_tokens, cb.prompt_tokens, cb.completion_tokens,
+                                cb.successful_requests, cb.total_cost,
+                            ),
                         )
-                        state["result"] = result
-                    logger.info("Summary Aggregation Done")
-                    self.metrics.aggregation_tokens = cb.total_tokens
-                    logger.info(
-                        "Total Tokens: %s, "
-                        "Prompt Tokens: %s, "
-                        "Completion Tokens: %s, "
-                        "Successful Requests: %s, "
-                        "Total Cost (USD): $%s"
-                        % (
-                            cb.total_tokens,
-                            cb.prompt_tokens,
-                            cb.completion_tokens,
-                            cb.successful_requests,
-                            cb.total_cost,
-                        ),
-                    )
-                self.metrics.aggregation_latency = bas.execution_time
+                        self.metrics.aggregation_latency = bas.execution_time
+                # --- FINAL FIX END ---
+
         if self.log_dir:
             log_path = Path(self.log_dir).joinpath("summary_metrics.json")
             self.metrics.dump_json(log_path.absolute())
