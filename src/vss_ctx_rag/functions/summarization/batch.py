@@ -37,6 +37,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from vss_ctx_rag.utils.common_utils import is_gemini_model, is_claude_model # Make sure is_gemini_model is imported
+from vss_ctx_rag.base import Function
+
 
 
 class BatchSummarization(Function):
@@ -126,7 +130,7 @@ class BatchSummarization(Function):
             return get_openai_callback()
 
     async def _process_full_batch(self, batch):
-        """Process a full batch immediately"""
+        """Process a full batch, with special handling for long Gemini inputs."""
         with TimeMeasure(
             "Batch "
             + str(batch._batch_index)
@@ -143,19 +147,22 @@ class BatchSummarization(Function):
             )
             try:
                 with self._get_appropriate_callback() as cb:
+                    
+                    # --- NEW: Conditional logic for Gemini vs. other models ---
+                    
+                    # Prepare the full input text from all documents in the batch
+                    full_input_text = " ".join([doc for doc, _, _ in batch.as_list()])
+                    model_name = self.get_param("llm", "model")
+                    
+                    # Define a safe character limit for Gemini based on our log analysis
+                    GEMINI_INPUT_LIMIT = 850
+
                     if self.endless_ai_enabled:
                         def image_file_to_base64(filepath):
-                            # Open the image file in binary mode
                             with open(filepath, 'rb') as image_file:
                                 image_data = image_file.read()
+                            return base64.b64encode(image_data).decode('utf-8')
 
-                            # Encode the binary data to base64
-                            base64_data = base64.b64encode(image_data)
-
-                            # Convert bytes to a string (optional)
-                            return base64_data.decode('utf-8')
-
-                        # Fetch image data
                         unique_images = set()
                         for doc, doc_i, doc_meta in batch.as_list():
                             if doc_meta.get("grid_filenames"):
@@ -164,18 +171,54 @@ class BatchSummarization(Function):
                     else:
                         images = []
 
-                    if len(batch.as_list()) > 1 or len(images) > 0:
-                        batch_summary = await call_token_safe(
-                            {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
-                        )
-                    else:
-                        doc, _, doc_meta = batch.as_list()[0]
-                        if doc.strip() == "." and doc_meta.get("is_last", False):
-                            batch_summary = "Video Analysis completed."
-                        else:
-                            batch_summary = await call_token_safe(
-                                {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                    # Check if we are using a Gemini model AND if the input is too long
+                    if is_gemini_model(model_name) and len(full_input_text) > GEMINI_INPUT_LIMIT:
+                        
+                        logger.warning(f"Gemini input length ({len(full_input_text)} chars) exceeds safe limit. Splitting text to avoid silent failure.")
+
+                        # 1. MAP STEP: Split the long text into smaller chunks
+                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=GEMINI_INPUT_LIMIT, chunk_overlap=50)
+                        text_chunks = text_splitter.split_text(full_input_text)
+                        
+                        summaries = []
+                        for chunk in text_chunks:
+                            # Summarize each smaller chunk individually
+                            chunk_summary = await call_token_safe(
+                                {"input": chunk, "images": []}, # Process text chunks without images
+                                self.batch_pipeline, 
+                                self.recursion_limit,
                             )
+                            if chunk_summary and chunk_summary.strip():
+                                summaries.append(chunk_summary)
+                        
+                        # 2. REDUCE STEP: Combine the individual summaries
+                        if not summaries:
+                            logger.error(f"All split-chunk summaries for batch {batch._batch_index} were empty. Resulting in an empty final summary.")
+                            batch_summary = "" # Default to empty if all chunks fail
+                        else:
+                            combined_summaries = "\n".join(summaries)
+                            logger.info(f"Aggregating {len(summaries)} chunk summaries for final output.")
+                            # Use the aggregation pipeline to create a single, final summary
+                            batch_summary = await call_token_safe(
+                                {"input": combined_summaries},
+                                self.aggregation_pipeline,
+                                self.recursion_limit,
+                            )
+                    else:
+                        # --- ORIGINAL LOGIC: For other models or short Gemini inputs ---
+                        if len(batch.as_list()) > 1 or len(images) > 0:
+                            batch_summary = await call_token_safe(
+                                {"input": full_input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
+                            )
+                        else:
+                            doc, _, doc_meta = batch.as_list()[0]
+                            if doc.strip() == "." and doc_meta.get("is_last", False):
+                                batch_summary = "Video Analysis completed."
+                            else:
+                                batch_summary = await call_token_safe(
+                                    {"input": full_input_text, "images": images}, self.batch_pipeline, self.recursion_limit,
+                                )
+
             except Exception as e:
                 logger.error(
                     f"Error summarizing batch {batch._batch_index}: {e}"
