@@ -145,6 +145,9 @@ class BatchSummarization(Function):
             logger.info(
                 "Batch %d is full. Processing ...", batch._batch_index
             )
+            model_name = self.get_param("llm", "model")
+            if is_gemini_model(model_name):
+                await asyncio.sleep(0.5)
             try:
                 with self._get_appropriate_callback() as cb:
                     if self.endless_ai_enabled:
