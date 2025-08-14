@@ -37,6 +37,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from vss_ctx_rag.utils.common_utils import is_gemini_model, is_claude_model # Make sure is_gemini_model is imported
+from vss_ctx_rag.base import Function
+
 
 
 class BatchSummarization(Function):
@@ -141,6 +145,9 @@ class BatchSummarization(Function):
             logger.info(
                 "Batch %d is full. Processing ...", batch._batch_index
             )
+            model_name = self.get_param("llm", "model")
+            if is_gemini_model(model_name):
+                await asyncio.sleep(0.5)
             try:
                 with self._get_appropriate_callback() as cb:
                     if self.endless_ai_enabled:

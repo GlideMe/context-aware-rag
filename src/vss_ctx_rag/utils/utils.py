@@ -85,6 +85,8 @@ def remove_lucene_chars(text: str) -> str:
             text = text.replace(char, " ")
     return text.strip()
 
+
+
 class RequestInfo:
     def __init__(
         self,

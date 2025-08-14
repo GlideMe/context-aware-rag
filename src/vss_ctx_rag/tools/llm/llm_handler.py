@@ -17,6 +17,12 @@ import os
 import time
 from typing import Optional, Iterator, Dict, Any, List
 
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
@@ -29,6 +35,7 @@ from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
 from vss_ctx_rag.utils.common_utils import (
     is_openai_model,
     is_claude_model,
+    is_gemini_model,
 )
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
@@ -240,4 +247,215 @@ class ChatClaudeTool(LLMTool):
         # Update the LLM configuration
         self.llm = self.llm.with_config(configurable={"model_kwargs": current_kwargs})
         
-        logger.debug(f"Updated Claude LLM configuration: {current_kwargs}")
+        logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
+
+
+class GeminiLLM(BaseChatModel):
+    """Langchain wrapper for Google Gemini models using ChatGoogleGenerativeAI"""
+    
+    # Pydantic field declarations - NO hardcoded defaults
+    model_name: str
+    api_key: str
+    max_tokens: int
+    temperature: float
+    top_p: float
+    _client: Optional[ChatGoogleGenerativeAI] = None
+    
+    def __init__(self, model_name: str, api_key: str, **kwargs):
+        # Extract config values with fallback defaults
+        max_tokens = kwargs.get('max_tokens', 4096)
+        temperature = kwargs.get('temperature', 0.1) 
+        top_p = kwargs.get('top_p', 0.9)
+        
+        # Pass extracted values to parent class
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            **kwargs
+        )
+        if not GEMINI_AVAILABLE:
+            raise ImportError(
+                "langchain_google_genai is not available. "
+                "Install with: pip install langchain_google_genai"
+            )
+        
+        # Initialize the langchain client
+        self._client = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temperature,
+            max_output_tokens=max_tokens
+            # Note: top_p not directly supported
+        )
+        
+        logger.info(f"Initialized Gemini LLM for model: {model_name}")
+    
+    def _prepare_messages(self, messages: List[BaseMessage]) -> List[BaseMessage]:
+        """Prepare messages for ChatGoogleGenerativeAI with system message handling"""
+        prepared_messages = []
+        system_content = None
+        
+        # Extract system message
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                system_content = str(msg.content)
+                break
+        
+        # Process other messages
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                content = str(msg.content)
+                # Prepend system message to first user message
+                if system_content and len(prepared_messages) == 0:
+                    content = f"{system_content}\n\n{content}"
+                    system_content = None
+                prepared_messages.append(HumanMessage(content=content))
+            elif isinstance(msg, AIMessage):
+                prepared_messages.append(AIMessage(content=str(msg.content)))
+        
+        return prepared_messages
+    
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, run_manager=None, **kwargs) -> ChatResult:
+        """Generate a single response using ChatGoogleGenerativeAI"""
+        try:
+            # Prepare messages for ChatGoogleGenerativeAI
+            prepared_messages = self._prepare_messages(messages)
+            
+            # Update client configuration with current parameters
+            self._client.temperature = self.temperature
+            self._client.max_output_tokens = self.max_tokens
+            
+            # Call ChatGoogleGenerativeAI directly
+            response = self._client.invoke(prepared_messages)
+            
+            # Create ChatGeneration from response
+            generation = ChatGeneration(message=response)
+            
+            return ChatResult(generations=[generation])
+            
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            raise
+
+    def _stream(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> Iterator[ChatGeneration]:
+        """Stream response from ChatGoogleGenerativeAI"""
+        try:
+            # Prepare messages
+            prepared_messages = self._prepare_messages(messages)
+            
+            # Update client configuration
+            self._client.temperature = self.temperature
+            self._client.max_output_tokens = self.max_tokens
+            
+            # Use streaming if available
+            for chunk in self._client.stream(prepared_messages):
+                yield ChatGeneration(message=chunk)
+        except Exception:
+            # Fallback to non-streaming
+            result = self._generate(messages, stop, **kwargs)
+            yield result.generations[0]
+    
+    @property
+    def _llm_type(self) -> str:
+        return "gemini-direct-api"
+
+
+class ChatGeminiTool(LLMTool):
+    def __init__(self, model=None, api_key=None, **llm_params) -> None:
+        if not GEMINI_AVAILABLE:
+            raise ImportError(
+                "langchain_google_genai is not available. "
+                "Install with: pip install langchain_google_genai"
+            )
+        
+        # Set default model if not provided - Flash is faster for testing, Pro for production
+        model_name = model or "models/gemini-2.5-flash"  # or "gemini-2.5-flash-exp"
+        
+        # Configure API key
+        api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "Google API key is required. Set GOOGLE_API_KEY environment variable "
+                "or pass api_key parameter."
+            )
+        
+        # Extract parameters for ChatGoogleGenerativeAI
+        max_tokens = llm_params.get("max_tokens", 4096)
+        temperature = llm_params.get("temperature", 0.1)
+        top_p = llm_params.get("top_p", 0.9)
+        
+        logger.info(f"Initializing ChatGoogleGenerativeAI for model: {model_name}")
+        
+        # Create ChatGoogleGenerativeAI directly instead of custom wrapper
+        gemini_llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temperature,
+            max_output_tokens=max_tokens
+            # Note: top_p not directly supported in langchain_google_genai
+        ).configurable_fields(
+            temperature=ConfigurableField(id="temperature"),
+            max_output_tokens=ConfigurableField(id="max_tokens")
+        )
+        
+        super().__init__(
+            llm=gemini_llm,
+            name="gemini_tool"
+        )
+        
+        # Enhanced warmup with retry logic
+        try:
+            if os.getenv("CA_RAG_ENABLE_WARMUP", "false").lower() == "true":
+                self.warmup(model_name)
+        except Exception as e:
+            logger.error(f"Error warming up Gemini LLM: {e}")
+            # Don't raise - allow initialization to continue for graceful degradation
+            logger.warning("Continuing without warmup - model will initialize on first use")
+    
+    def warmup(self, model_name):
+        """Warm up the Gemini model with retry logic for reliability."""
+        max_warmup_attempts = 3
+        
+        for attempt in range(max_warmup_attempts):
+            try:
+                logger.info(f"Warming up Gemini LLM {model_name} (attempt {attempt + 1}/{max_warmup_attempts})")
+                
+                # Use a simple, cost-effective warmup prompt
+                warmup_response = self.invoke("Hello")
+                
+                logger.info(f"Gemini warmup successful: {str(warmup_response)[:100]}...")
+                return
+                
+            except Exception as e:
+                if attempt < max_warmup_attempts - 1:
+                    logger.warning(f"Warmup attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    logger.error(f"All warmup attempts failed for {model_name}: {e}")
+                    raise
+
+    def update(self, top_p=None, temperature=None, max_tokens=None):
+        """Update Gemini model configuration with validation and optimization."""
+        configurable_dict = {}
+        
+        # Validate and optimize parameters for Gemini 2.5
+        if temperature is not None:
+            temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
+            configurable_dict['temperature'] = temperature
+            
+        if max_tokens is not None:
+            # Optimize for Gemini 2.5's capabilities
+            max_tokens = max(1, min(32768, int(max_tokens)))  # Clamp to model limits
+            configurable_dict['max_tokens'] = max_tokens
+        
+        # Note: top_p is not configurable in ChatGoogleGenerativeAI
+        if top_p is not None:
+            logger.warning("top_p parameter is not supported by ChatGoogleGenerativeAI")
+        
+        # Update the LLM configuration
+        if configurable_dict:
+            self.llm = self.llm.with_config(configurable=configurable_dict)
+            logger.debug(f"Updated Gemini LLM configuration: {configurable_dict}")
