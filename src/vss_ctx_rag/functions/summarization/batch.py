@@ -187,9 +187,7 @@ class BatchSummarization(Function):
                             batch_summary = await call_token_safe(
                                 {"input": input_text, "images": images}, 
                                 self.batch_pipeline, 
-                                self.recursion_limit,
-                                model_name=model_name,  # <-- CHANGE 2: Pass model_name
-                                batch_index=batch._batch_index
+                                self.recursion_limit
                             )
                         else:
                             doc, _, doc_meta = batch.as_list()[0]
@@ -201,14 +199,8 @@ class BatchSummarization(Function):
                                 batch_summary = await call_token_safe(
                                     {"input": input_text, "images": images}, 
                                     self.batch_pipeline, 
-                                    self.recursion_limit,
-                                    model_name=model_name,
-                                    batch_index=batch._batch_index
+                                    self.recursion_limit
                                 )
-
-                        # LOG: Result from call_token_safe
-                        logger.info(f"DEBUG: Batch {batch._batch_index} summary length: {len(batch_summary) if batch_summary else 0}")
-                        logger.info(f"DEBUG: Batch {batch._batch_index} summary preview: {batch_summary[:200] if batch_summary else 'EMPTY'}...")
 
                 except Exception as e:
                     logger.error(f"ERROR: Batch {batch._batch_index} exception during processing: {e}")
@@ -355,7 +347,6 @@ class BatchSummarization(Function):
                             batches,
                             self.aggregation_pipeline,
                             self.recursion_limit,
-                            model_name=model_name  # ADD MODEL NAME HERE TOO
                         )
                         logger.info(f"DEBUG: Final aggregation result length: {len(result) if result else 0}")
                         logger.info(f"DEBUG: Final aggregation result preview: {result[:300] if result else 'EMPTY'}...")
