@@ -460,10 +460,6 @@ class GraphExtraction:
         logger.debug(f"Embedding parallel count: {self.embedding_parallel_count}")
         with TimeMeasure("GraphExtraction/FetchEntEmbd", "green"):
             rows = self.fetch_entities_for_embedding()
-        logger.info(f"DEBUG: Total entities to embed: {len(rows)}")
-        logger.info(f"DEBUG: First 5 entities: {[row['text'][:50] for row in rows[:5]]}")
-        logger.info(f"DEBUG: Batch size: {self.embedding_parallel_count}")
-        logger.info(f"DEBUG: Number of batches: {len(rows) // self.embedding_parallel_count + 1}")
         for i in range(0, len(rows), self.embedding_parallel_count):
             await self.update_embeddings(rows[i : i + self.embedding_parallel_count])
 
@@ -493,18 +489,15 @@ class GraphExtraction:
                             if "429" in str(e) or "Too Many Requests" in str(e):
                                 if attempt < max_retries - 1:
                                     delay = 2 ** attempt  # 1s, 2s, 4s delays
-
                                     logger.warning(f"GRAPH DB RATE LIMIT HIT, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
                                     await asyncio.sleep(delay)
                                     continue
                                 else:
                                     logger.error(f"GRAPH DB RATE LIMIT HIT, All {max_retries} retries failed for rate limiting")
-
                                     raise
                             else:
                                 # Non-rate-limit error, don't retry
                                 raise
-
 
             tasks = [
                 asyncio.create_task(semaphore_controlled_embed(row["text"]))

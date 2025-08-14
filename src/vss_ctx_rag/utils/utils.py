@@ -18,6 +18,8 @@
 import jsonschema
 import json
 import re
+import asyncio
+from .common_utils import is_gemini_model
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.context_manager.context_manager_models import (
     ContextManagerConfig,
@@ -84,8 +86,6 @@ def remove_lucene_chars(text: str) -> str:
         if char in text:
             text = text.replace(char, " ")
     return text.strip()
-
-
 
 class RequestInfo:
     def __init__(
