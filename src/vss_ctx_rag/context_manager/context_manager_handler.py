@@ -376,6 +376,9 @@ class ContextManagerHandler:
                     chat_config["params"]["endless_ai_enabled"] = chat_config["params"].get(
                         "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
                     )
+                    chat_config["params"]["chunk_size"] = chat_config["params"].get(
+                        "chunk_size", 0
+                    )
                     if chat_config["rag"] == "graph-rag":
                         if self.neo4jDB is None:
                             self.setup_neo4j(chat_config)
@@ -393,6 +396,7 @@ class ContextManagerHandler:
                                 "retrieval_function",
                                 GraphRetrievalFunc("retrieval_function")
                                 .add_tool("graph_db", self.neo4jDB)
+                                .add_tool("vector_db", self.milvus_db)
                                 .add_tool(LLM_TOOL_NAME, self.chat_llm)
                                 .config(**chat_config)
                                 .done(),
