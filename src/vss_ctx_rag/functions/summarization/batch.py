@@ -21,6 +21,7 @@ from pathlib import Path
 import time
 from langchain_community.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
+from contextlib import contextmanager
 from schema import Schema
 import base64
 
@@ -128,6 +129,19 @@ class BatchSummarization(Function):
         model_name = self.get_param("llm", "model")
         if is_claude_model(model_name):
             return get_bedrock_anthropic_callback()
+        elif is_gemini_model(model_name):
+            # For Gemini, there is no specific token callback.
+            # We use a dummy context manager to avoid logging incorrect OpenAI metrics.
+            @contextmanager
+            def dummy_callback():
+                class DummyCallback:
+                    total_tokens = 0
+                    prompt_tokens = 0
+                    completion_tokens = 0
+                    successful_requests = 1
+                    total_cost = 0.0
+                yield DummyCallback()
+            return dummy_callback()
         else:
             return get_openai_callback()
 
