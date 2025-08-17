@@ -134,12 +134,12 @@ class ContextManagerHandler:
         """Return the model name for the given llm tool if possible."""
         if llm_tool is None:
             return ""
-        for attr in ["model", "model_name", "model_id"]:
+        for attr in ["model", "model_name"]:
             if hasattr(llm_tool, attr):
                 return getattr(llm_tool, attr)
         llm_obj = getattr(llm_tool, "llm", None)
         if llm_obj is not None:
-            for attr in ["model", "model_name", "model_id"]:
+            for attr in ["model", "model_name"]:
                 if hasattr(llm_obj, attr):
                     return getattr(llm_obj, attr)
         return ""
