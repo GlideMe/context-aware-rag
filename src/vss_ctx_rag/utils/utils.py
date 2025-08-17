@@ -18,8 +18,6 @@
 import jsonschema
 import json
 import re
-import asyncio
-from .common_utils import is_gemini_model
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.context_manager.context_manager_models import (
     ContextManagerConfig,
