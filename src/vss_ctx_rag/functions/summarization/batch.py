@@ -38,10 +38,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from vss_ctx_rag.utils.common_utils import is_gemini_model, is_claude_model # Make sure is_gemini_model is imported
 from vss_ctx_rag.base import Function
-
 
 
 class BatchSummarization(Function):
@@ -62,7 +60,6 @@ class BatchSummarization(Function):
         {"start_index": int, "end_index": int}, ignore_extra_keys=True
     )
     metrics = SummaryMetrics()
-    semaphore: asyncio.Semaphore 
 
     def setup(self):
         def prepare_messages(inputs):
@@ -122,7 +119,6 @@ class BatchSummarization(Function):
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
         self.summary_start_time = None
         self.enable_summary = True
-        self.semaphore = asyncio.Semaphore(10)
 
     def _get_appropriate_callback(self):
         """Get the appropriate callback based on the LLM being used"""
@@ -147,111 +143,92 @@ class BatchSummarization(Function):
 
     async def _process_full_batch(self, batch):
         """Process a full batch immediately"""
-        async with self.semaphore:
-            with TimeMeasure(
-                "Batch "
-                + str(batch._batch_index)
-                + " Summary IS LAST "
-                + str(
-                    any(
-                        doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
-                    )
-                ),
-                "pink",
-            ):
-                logger.info(
-                    "=== BATCH PROCESSING START: Batch %d is full. Processing ...", batch._batch_index
+        with TimeMeasure(
+            "Batch "
+            + str(batch._batch_index)
+            + " Summary IS LAST "
+            + str(
+                any(
+                    doc_meta.get("is_last", False) for _, _, doc_meta in batch.as_list()
                 )
-                
-                # LOG: Batch content details
-                batch_list = batch.as_list()
-                logger.debug(f"DEBUG: Batch {batch._batch_index} contains {len(batch_list)} documents")
-                for idx, (doc, doc_i, doc_meta) in enumerate(batch_list):
-                    logger.info(f"DEBUG: Batch {batch._batch_index} Doc {idx}: length={len(doc)}, doc_i={doc_i}, meta={doc_meta}")
-                
-                batch_summary = "" # Ensure batch_summary is initialized
-                try:
-                    with self._get_appropriate_callback() as cb:
-                        # --- CHANGE 1: Get the model name ---
-                        model_name = self.get_param("llm", "model")
-                        logger.info(f"DEBUG: Batch {batch._batch_index} using model: {model_name}")
-                        
-                        if self.endless_ai_enabled:
-                            def image_file_to_base64(filepath):
-                                with open(filepath, 'rb') as image_file:
-                                    image_data = image_file.read()
-                                return base64.b64encode(image_data).decode('utf-8')
-
-                            unique_images = set()
-                            for doc, doc_i, doc_meta in batch.as_list():
-                                if doc_meta.get("grid_filenames"):
-                                    unique_images.update(doc_meta["grid_filenames"].split('|'))
-                            images = [image_file_to_base64(img) for img in list(unique_images)]
-                            logger.info(f"DEBUG: Batch {batch._batch_index} has {len(images)} images")
-                        else:
-                            images = []
-
-                        # LOG: Input being sent to call_token_safe
-                        input_text = " ".join([doc for doc, _, _ in batch.as_list()])
-                        logger.info(f"DEBUG: Batch {batch._batch_index} input text length: {len(input_text)}")
-                        logger.info(f"DEBUG: Batch {batch._batch_index} input text preview: {input_text[:200]}...")
-
-                        if len(batch.as_list()) > 1 or len(images) > 0:
-                            logger.info(f"DEBUG: Batch {batch._batch_index} calling call_token_safe (multi-doc path)")
-                            batch_summary = await call_token_safe(
-                                {"input": input_text, "images": images}, 
-                                self.batch_pipeline, 
-                                self.recursion_limit
-                            )
-                        else:
-                            doc, _, doc_meta = batch.as_list()[0]
-                            if doc.strip() == "." and doc_meta.get("is_last", False):
-                                logger.info(f"DEBUG: Batch {batch._batch_index} is final marker batch")
-                                batch_summary = "Video Analysis completed."
-                            else:
-                                logger.info(f"DEBUG: Batch {batch._batch_index} calling call_token_safe (single-doc path)")
-                                batch_summary = await call_token_safe(
-                                    {"input": input_text, "images": images}, 
-                                    self.batch_pipeline, 
-                                    self.recursion_limit
-                                )
-
-                except Exception as e:
-                    logger.error(f"ERROR: Batch {batch._batch_index} exception during processing: {e}")
-                    batch_summary = "."
-                
-                # Final safety check in case the retry logic returns an error or is empty
-                if not batch_summary or not batch_summary.strip():
-                    logger.warning(f"WARNING: Batch {batch._batch_index} returned empty summary, using fallback")
-                    batch_summary = "."
-
-                self.metrics.summary_tokens += cb.total_tokens
-                self.metrics.summary_requests += cb.successful_requests
-                logger.info("=== BATCH PROCESSING END: Batch %d summary: %s", batch._batch_index, batch_summary)
-                logger.info(
-                    "Total Tokens: %s, Prompt Tokens: %s, Completion Tokens: %s, Successful Requests: %s, Total Cost (USD): $%s"
-                    % (
-                        cb.total_tokens,
-                        cb.prompt_tokens,
-                        cb.completion_tokens,
-                        cb.successful_requests,
-                        cb.total_cost,
-                    ),
-                )
-            
+            ),
+            "pink",
+        ):
+            logger.info(
+                "Batch %d is full. Processing ...", batch._batch_index
+            )
             try:
-                batch_list = batch.as_list()
-                last_doc_meta = batch_list[-1][2] if batch_list else {}
-                batch_meta = {
-                    **last_doc_meta,
-                    "batch_i": batch._batch_index,
-                    "doc_type": "caption_summary",
-                }
-                logger.debug(f"DEBUG: Batch {batch._batch_index} saving to vector_db with metadata: {batch_meta}")
-                self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
-            
+                with self._get_appropriate_callback() as cb:
+                    if self.endless_ai_enabled:
+                        def image_file_to_base64(filepath):
+                            # Open the image file in binary mode
+                            with open(filepath, 'rb') as image_file:
+                                image_data = image_file.read()
+
+                            # Encode the binary data to base64
+                            base64_data = base64.b64encode(image_data)
+
+                            # Convert bytes to a string (optional)
+                            return base64_data.decode('utf-8')
+
+                        # Fetch image data
+                        unique_images = set()
+                        for doc, doc_i, doc_meta in batch.as_list():
+                            if doc_meta.get("grid_filenames"):
+                                unique_images.update(doc_meta["grid_filenames"].split('|'))
+                        images = [image_file_to_base64(img) for img in list(unique_images)]
+                    else:
+                        images = []
+
+                    if len(batch.as_list()) > 1 or len(images) > 0:
+                        batch_summary = await call_token_safe(
+                            {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                        )
+                    else:
+                        doc, _, doc_meta = batch.as_list()[0]
+                        if doc.strip() == "." and doc_meta.get("is_last", False):
+                            batch_summary = "Video Analysis completed."
+                        else:
+                            batch_summary = await call_token_safe(
+                                {"input": " ".join([doc for doc, _, _ in batch.as_list()]), "images": images}, self.batch_pipeline, self.recursion_limit,
+                            )
             except Exception as e:
-                logger.error(f"ERROR: Batch {batch._batch_index} failed to save to vector_db: {e}")
+                logger.error(
+                    f"Error summarizing batch {batch._batch_index}: {e}"
+                )
+                batch_summary = "."
+            self.metrics.summary_tokens += cb.total_tokens
+            self.metrics.summary_requests += cb.successful_requests
+            logger.info("Batch %d summary: %s", batch._batch_index, batch_summary)
+            logger.info(
+                "Total Tokens: %s, "
+                "Prompt Tokens: %s, "
+                "Completion Tokens: %s, "
+                "Successful Requests: %s, "
+                "Total Cost (USD): $%s"
+                % (
+                    cb.total_tokens,
+                    cb.prompt_tokens,
+                    cb.completion_tokens,
+                    cb.successful_requests,
+                    cb.total_cost,
+                ),
+            )
+        try:
+            # Get metadata from the last document in the batch
+            batch_list = batch.as_list()
+            last_doc_meta = batch_list[-1][2] if batch_list else {}
+            batch_meta = {
+                **last_doc_meta,
+                "batch_i": batch._batch_index,
+                "doc_type": "caption_summary",
+            }
+
+            # TODO: Use the async method once https://github.com/langchain-ai/langchain-milvus/pull/29 is released
+            # await self.vector_db.aadd_summary(summary=batch_summary, metadata=batch_meta)
+            self.vector_db.add_summary(summary=batch_summary, metadata=batch_meta)
+        except Exception as e:
+            logger.error(e)
 
     async def acall(self, state: dict):
         """batch summarization function call
@@ -268,7 +245,6 @@ class BatchSummarization(Function):
             }
         """
         with TimeMeasure("OffBatchSumm/Acall", "blue"):
-            logger.info("=== FINAL AGGREGATION START ===")
             batches = []
             self.call_schema.validate(state)
             stop_time = time.time() + self.timeout
@@ -276,19 +252,14 @@ class BatchSummarization(Function):
                 state["start_index"]
             )
             target_end_batch_index = self.batcher.get_batch_index(state["end_index"])
-            logger.info(f"DEBUG: Target Batch Start: {target_start_batch_index}")
-            logger.info(f"DEBUG: Target Batch End: {target_end_batch_index}")
-            logger.info(f"DEBUG: Timeout in {self.timeout} seconds")
-            
+            logger.info(f"Target Batch Start: {target_start_batch_index}")
+            logger.info(f"Target Batch End: {target_end_batch_index}")
             if target_end_batch_index == -1:
-                logger.info(f"DEBUG: Current batch index: {self.curr_batch_i}")
+                logger.info(f"Current batch index: {self.curr_batch_i}")
                 target_end_batch_index = self.curr_batch_i
 
             # Track fetched batch indices
             fetched_batch_indices = set()
-            total_expected_batches = target_end_batch_index - target_start_batch_index + 1
-            logger.info(f"DEBUG: Expecting {total_expected_batches} total batches")
-            
             while time.time() < stop_time:
                 # Only query for unfetched batches
                 unfetched_indices = [
@@ -297,80 +268,59 @@ class BatchSummarization(Function):
                     if i not in fetched_batch_indices
                 ]
                 if not unfetched_indices:
-                    logger.info("DEBUG: All batches found, breaking from wait loop")
                     break
-
-                logger.info(f"DEBUG: Still waiting for batches: {unfetched_indices}")
 
                 # Query only for new batches
                 batch_filter = f"doc_type == 'caption_summary' and batch_i in [{','.join(map(str, unfetched_indices))}]"
-                logger.info(f"DEBUG: Querying vector_db with filter: {batch_filter}")
-                
                 new_batches = await self.vector_db.aget_text_data(
                     fields=["text", "batch_i"], filter=batch_filter
                 )
-                logger.info(f"DEBUG: Vector_db returned {len(new_batches)} new batches")
 
                 # Update fetched indices and add to results
                 for batch in new_batches:
-                    logger.info(f"DEBUG: Found batch {batch['batch_i']}, text length: {len(batch.get('text', ''))}")
-                    logger.info(f"DEBUG: Batch {batch['batch_i']} text preview: {batch.get('text', '')[:200]}...")
                     fetched_batch_indices.add(batch["batch_i"])
                 batches.extend(new_batches)
 
                 # If we have all required batches, break
-                if len(fetched_batch_indices) == total_expected_batches:
+                if len(fetched_batch_indices) == (
+                    target_end_batch_index - target_start_batch_index + 1
+                ):
                     logger.info(
-                        f"DEBUG: All {len(fetched_batch_indices)} batches fetched. Moving forward."
+                        f"All {len(fetched_batch_indices)} batches fetched. Moving forward."
                     )
                     break
                 else:
-                    remaining = total_expected_batches - len(fetched_batch_indices)
-                    logger.info(f"DEBUG: Need {remaining} more batches. Waiting...")
+                    remaining = (
+                        target_end_batch_index
+                        - target_start_batch_index
+                        + 1
+                        - len(fetched_batch_indices)
+                    )
+                    logger.info(f"Need {remaining} more batches. Waiting...")
                     await asyncio.sleep(1)
                     continue
 
             # Sort batches by batch_i field
             batches.sort(key=lambda x: x["batch_i"])
-            logger.info(f"DEBUG: Final batch count: {len(batches)}")
-            logger.info(f"DEBUG: Batch indices found: {[b['batch_i'] for b in batches]}")
-            
-            # LOG: Complete aggregation input
-            total_input_length = sum(len(batch.get("text", "")) for batch in batches)
-            logger.info(f"DEBUG: Total aggregation input length: {total_input_length} characters")
-            
-            for i, batch in enumerate(batches):
-                logger.info(f"DEBUG: Aggregation input batch {i} (batch_i={batch['batch_i']}): length={len(batch.get('text', ''))}")
-                logger.info(f"DEBUG: Aggregation input batch {i} content: {batch.get('text', '')[:300]}...")
+            logger.info(f"Number of Batches Fetched: {len(batches)}")
 
             if len(batches) == 0:
-                logger.error("ERROR: No batch summaries found for final aggregation")
                 state["result"] = ""
                 state["error_code"] = "No batch summaries found"
+                logger.error("No batch summaries found")
             elif len(batches) > 0:
                 with TimeMeasure("summ/acall/batch-aggregation-summary", "pink") as bas:
-                    logger.info("DEBUG: Starting final aggregation with call_token_safe")
-                    
-                    # Get model name for logging
-                    model_name = self.get_param("llm", "model")
-                    logger.info(f"DEBUG: Final aggregation using model: {model_name}")
-                    
                     with self._get_appropriate_callback() as cb:
-                        logger.info(f"DEBUG: Calling call_token_safe for final aggregation with {len(batches)} batches")
                         result = await call_token_safe(
                             batches,
                             self.aggregation_pipeline,
                             self.recursion_limit,
                         )
-                        logger.info(f"DEBUG: Final aggregation result length: {len(result) if result else 0}")
-                        logger.info(f"DEBUG: Final aggregation result preview: {result[:300] if result else 'EMPTY'}...")
-                        logger.info(f"DEBUG: Final aggregation result ending: ...{result[-300:] if result and len(result) > 300 else result}")
-                        
                         state["result"] = result
-                    logger.info("DEBUG: Summary Aggregation Done")
+                    logger.info("Summary Aggregation Done")
                     self.metrics.aggregation_tokens = cb.total_tokens
                     logger.info(
-                        "Final Aggregation - Total Tokens: %s, "
+                        "Total Tokens: %s, "
                         "Prompt Tokens: %s, "
                         "Completion Tokens: %s, "
                         "Successful Requests: %s, "
@@ -384,9 +334,6 @@ class BatchSummarization(Function):
                         ),
                     )
                 self.metrics.aggregation_latency = bas.execution_time
-            
-            logger.info("=== FINAL AGGREGATION END ===")
-            
         if self.log_dir:
             log_path = Path(self.log_dir).joinpath("summary_metrics.json")
             self.metrics.dump_json(log_path.absolute())
