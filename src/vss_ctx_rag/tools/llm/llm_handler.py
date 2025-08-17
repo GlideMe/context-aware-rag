@@ -16,13 +16,7 @@
 import os
 import time
 from typing import Optional, Iterator, Dict, Any, List
-
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
@@ -273,11 +267,6 @@ class GeminiLLM(BaseChatModel):
             top_p=top_p,
             **kwargs
         )
-        if not GEMINI_AVAILABLE:
-            raise ImportError(
-                "langchain_google_genai is not available. "
-                "Install with: pip install langchain_google_genai"
-            )
         
         # Initialize the langchain client
         self._client = ChatGoogleGenerativeAI(
@@ -362,11 +351,6 @@ class GeminiLLM(BaseChatModel):
 
 class ChatGeminiTool(LLMTool):
     def __init__(self, model=None, api_key=None, **llm_params) -> None:
-        if not GEMINI_AVAILABLE:
-            raise ImportError(
-                "langchain_google_genai is not available. "
-                "Install with: pip install langchain_google_genai"
-            )
         
         # Set default model if not provided - Flash is faster for testing, Pro for production
         model_name = model or "models/gemini-2.5-flash"  # or "gemini-2.5-flash-exp"
