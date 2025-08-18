@@ -66,6 +66,11 @@ class GraphRetrieval:
         self.chat_system_prompt = chat_system_prompt 
         self.uuid = uuid
         self.multi_channel = multi_channel
+        self._build_chains()
+
+    def _build_chains(self):
+        """(Re)build internal chains that depend on the chat LLM."""
+
         summarization_prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -77,7 +82,7 @@ class GraphRetrieval:
                 MessagesPlaceholder(variable_name="chat_history"),
             ]
         )
-        self.chat_history_summarization_chain = summarization_prompt | llm
+        self.chat_history_summarization_chain = summarization_prompt | self.chat_llm
 
         def prepare_messages(inputs):
             context = inputs.get("context", "")
