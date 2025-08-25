@@ -1,4 +1,5 @@
 import re
+from contextlib import contextmanager
 
 def is_openai_model(model_name: str) -> bool:
     """Return True if the model name refers to an OpenAI model."""
@@ -56,3 +57,15 @@ def is_gemini_model(model_name: str) -> bool:
     )
 
     return any(model.startswith(prefix) for prefix in gemini_prefixes)
+
+
+@contextmanager
+def dummy_callback():
+    """Create a dummy callback for models that don't support token tracking (e.g., Gemini)."""
+    class DummyCallback:
+        total_tokens = 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        successful_requests = 1
+        total_cost = 0.0
+    yield DummyCallback()

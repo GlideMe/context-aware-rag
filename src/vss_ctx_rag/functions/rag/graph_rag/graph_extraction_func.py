@@ -39,7 +39,7 @@ from vss_ctx_rag.utils.globals import (
     DEFAULT_EMBEDDING_PARALLEL_COUNT,
 )
 from vss_ctx_rag.functions.rag.graph_rag.constants import QUERY_TO_DELETE_UUID_GRAPH
-from vss_ctx_rag.utils.common_utils import is_claude_model, is_gemini_model
+from vss_ctx_rag.utils.common_utils import is_claude_model, is_gemini_model, dummy_callback
 
 
 class GraphExtractionFunc(Function):
@@ -130,25 +130,31 @@ class GraphExtractionFunc(Function):
                             with get_bedrock_anthropic_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
                         elif is_gemini_model(model_name):
-                            # For Gemini, there is no specific token callback.
-                            # We run it directly to avoid logging incorrect OpenAI metrics.
-                            await self.graph_extraction.acreate_graph(batch)
-                            # Create a dummy callback object so the logging below doesn't fail
-                            @contextmanager
-                            def dummy_callback():
-                                class DummyCallback:
-                                    total_tokens = 0
-                                    prompt_tokens = 0
-                                    completion_tokens = 0
-                                    successful_requests = 1
-                                    total_cost = 0.0
-                                yield DummyCallback()
+                            # For Gemini, there is no specific token callback in langchain
                             with dummy_callback() as cb:
-                                # This populates 'cb' for the logging code that follows
-                                pass
+                                await self.graph_extraction.acreate_graph(batch)
                         else:
                             with get_openai_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
+                        
+                        logger.info(
+                            "GraphRAG Creation for %d docs\n"
+                            "Total Tokens: %s, "
+                            "Prompt Tokens: %s, "
+                            "Completion Tokens: %s, "
+                            "Successful Requests: %s, "
+                            "Total Cost (USD): $%s"
+                            % (
+                                batch._batch_size,
+                                cb.total_tokens,
+                                cb.prompt_tokens,
+                                cb.completion_tokens,
+                                cb.successful_requests,
+                                cb.total_cost,
+                            ),
+                        )
+                        self.metrics.graph_create_tokens += cb.total_tokens
+                        self.metrics.graph_create_requests += cb.successful_requests
                         
                         logger.info(
                             "GraphRAG Creation for %d docs\n"
