@@ -312,10 +312,8 @@ class ContextManagerHandler:
                     summ_config["params"]["batch_size"] = summ_config["params"].get(
                         "batch_size", DEFAULT_BATCH_SUMMARIZATION_BATCH_SIZE
                     )
-                    summ_config["params"]["endless_ai_enabled"] = summ_config["params"].get(
-                        "endless_ai_enabled", DEFAULT_ENDLESS_AI_ENABLED
-                    )
-                    
+                    summ_config["params"]["endless_use_grids_summ"] = req_info.endless_use_grids_summ
+
                     try:
                         if req_info and req_info.is_live:
                             logger.debug("Req Info: %s", req_info.summary_duration)
