@@ -64,10 +64,9 @@ class BatchSummarization(Function):
         def prepare_messages(inputs):
             system_prompt = self.get_param("prompts", "caption_summarization")
             content_blocks = []
-            if self.endless_ai_enabled:
+            if self.endless_use_grids_summ:
                 # Add image blocks if any are present
                 images = inputs.get("images", [])
-
                 content_blocks.extend({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img}"}} for img in images)
 
             # Add the user question after the images (if any)
@@ -112,8 +111,8 @@ class BatchSummarization(Function):
             else DEFAULT_SUMM_RECURSION_LIMIT
         )
 
-        self.endless_ai_enabled = self.get_param("params", "endless_ai_enabled")
-        logger.info(f"Batch endless_ai_enabled value: {self.endless_ai_enabled}")
+        self.endless_use_grids_summ = self.get_param("params", "endless_use_grids_summ")
+        logger.info(f"Batch endless_use_grids_summ value: {self.endless_use_grids_summ}")
 
         self.log_dir = os.environ.get("VIA_LOG_DIR", None)
         self.summary_start_time = None
@@ -148,7 +147,7 @@ class BatchSummarization(Function):
             )
             try:
                 with self._get_appropriate_callback() as cb:
-                    if self.endless_ai_enabled:
+                    if self.endless_use_grids_summ:
                         def image_file_to_base64(filepath):
                             # Open the image file in binary mode
                             with open(filepath, 'rb') as image_file:
@@ -369,7 +368,7 @@ class BatchSummarization(Function):
 
                 # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
-                #if self.endless_ai_enabled and doc != ".":
+                #if self.endless_use_grids_summ and doc != ".":
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
                     # Annoying, because the vlm spent time on it, but we do get better results this way - probably because the analysis is done using the grid images without the vlm results affecting it
                 #    doc = ""

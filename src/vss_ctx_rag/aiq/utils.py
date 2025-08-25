@@ -48,6 +48,7 @@ class RequestInfo:
         self.notification_max_tokens = None
         self.rag_type = "vector-rag"
         self.endless_ai_enabled = False
+        self.endless_use_grids_summ = False
 
 
 def aiq_to_vss_config(
@@ -145,6 +146,7 @@ def create_vss_ctx_rag_config(name: str):
         is_live: Optional[bool] = False
         uuid: Optional[str] = "1"
         endless_ai_enabled: Optional[bool] = False
+        endless_use_grids_summ: Optional[bool] = False
 
     return VssCtxRagToolConfig
 
