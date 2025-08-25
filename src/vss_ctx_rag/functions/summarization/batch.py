@@ -21,7 +21,6 @@ from pathlib import Path
 import time
 from langchain_community.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
-from contextlib import contextmanager
 from schema import Schema
 import base64
 
@@ -38,7 +37,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from vss_ctx_rag.utils.common_utils import is_gemini_model, is_claude_model, dummy_callback # Make sure is_gemini_model is imported
-from vss_ctx_rag.base import Function
+
 
 
 class BatchSummarization(Function):

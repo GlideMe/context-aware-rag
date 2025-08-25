@@ -50,10 +50,7 @@ def is_gemini_model(model_name: str) -> bool:
     model = model_name.lower()
 
     gemini_prefixes = (
-        "gemini",
         "gemini-",
-        "models/gemini",
-        "google/gemini",
     )
 
     return any(model.startswith(prefix) for prefix in gemini_prefixes)

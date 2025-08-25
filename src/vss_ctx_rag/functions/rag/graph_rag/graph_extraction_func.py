@@ -155,25 +155,6 @@ class GraphExtractionFunc(Function):
                         )
                         self.metrics.graph_create_tokens += cb.total_tokens
                         self.metrics.graph_create_requests += cb.successful_requests
-                        
-                        logger.info(
-                            "GraphRAG Creation for %d docs\n"
-                            "Total Tokens: %s, "
-                            "Prompt Tokens: %s, "
-                            "Completion Tokens: %s, "
-                            "Successful Requests: %s, "
-                            "Total Cost (USD): $%s"
-                            % (
-                                batch._batch_size,
-                                cb.total_tokens,
-                                cb.prompt_tokens,
-                                cb.completion_tokens,
-                                cb.successful_requests,
-                                cb.total_cost,
-                            ),
-                        )
-                        self.metrics.graph_create_tokens += cb.total_tokens
-                        self.metrics.graph_create_requests += cb.successful_requests
                     except Exception as e:
                         logger.error(traceback.format_exc())
                         logger.error(

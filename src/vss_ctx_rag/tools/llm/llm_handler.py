@@ -152,7 +152,7 @@ class ChatClaudeTool(LLMTool):
         # Extract parameters for ChatBedrock
         max_tokens = llm_params.get("max_tokens", 4096)
         temperature = llm_params.get("temperature", 0.1)
-        top_p = llm_params.get("top_p", 0.9)
+        top_p = llm_params.get("top_p", 0.7)
         
         logger.info(f"Initializing ChatBedrock client for model: {model_id}")
         
@@ -259,20 +259,21 @@ class ChatGeminiTool(LLMTool):
         # Extract parameters for ChatGoogleGenerativeAI
         max_tokens = llm_params.get("max_tokens", 4096)
         temperature = llm_params.get("temperature", 0.1)
-        top_p = llm_params.get("top_p", 0.9)
+        top_p = llm_params.get("top_p", 0.7)
         
         logger.info(f"Initializing ChatGoogleGenerativeAI for model: {model_name}")
         
-        # Create ChatGoogleGenerativeAI directly instead of custom wrapper
+        # Create ChatGoogleGenerativeAI 
         gemini_llm = ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=api_key,
             temperature=temperature,
-            max_output_tokens=max_tokens
-            # Note: top_p not directly supported in langchain_google_genai
+            max_output_tokens=max_tokens,
+            top_p=top_p
         ).configurable_fields(
             temperature=ConfigurableField(id="temperature"),
-            max_output_tokens=ConfigurableField(id="max_tokens")
+            max_output_tokens=ConfigurableField(id="max_tokens"),
+            top_p=ConfigurableField(id="top_p")
         )
         
         super().__init__(
@@ -325,9 +326,9 @@ class ChatGeminiTool(LLMTool):
             max_tokens = max(1, min(32768, int(max_tokens)))  # Clamp to model limits
             configurable_dict['max_tokens'] = max_tokens
         
-        # Note: top_p is not configurable in ChatGoogleGenerativeAI
         if top_p is not None:
-            logger.warning("top_p parameter is not supported by ChatGoogleGenerativeAI")
+            top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
+            configurable_dict['top_p'] = top_p
         
         # Update the LLM configuration
         if configurable_dict:
