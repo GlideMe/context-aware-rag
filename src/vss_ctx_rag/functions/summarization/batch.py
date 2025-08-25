@@ -21,12 +21,12 @@ from pathlib import Path
 import time
 from langchain_community.callbacks import get_openai_callback
 from langchain_community.callbacks.manager import get_bedrock_anthropic_callback
+from contextlib import contextmanager
 from schema import Schema
 import base64
 
 from vss_ctx_rag.base import Function
 from vss_ctx_rag.utils.utils import remove_think_tags, call_token_safe
-from vss_ctx_rag.utils.common_utils import is_claude_model
 from vss_ctx_rag.tools.storage import StorageTool
 from vss_ctx_rag.tools.health.rag_health import SummaryMetrics
 from vss_ctx_rag.utils.ctx_rag_logger import logger, TimeMeasure
@@ -37,6 +37,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from vss_ctx_rag.utils.common_utils import is_gemini_model, is_claude_model, dummy_callback # Make sure is_gemini_model is imported
+from vss_ctx_rag.base import Function
 
 
 class BatchSummarization(Function):
@@ -121,6 +123,9 @@ class BatchSummarization(Function):
         model_name = self.get_param("llm", "model")
         if is_claude_model(model_name):
             return get_bedrock_anthropic_callback()
+        elif is_gemini_model(model_name):
+            # For Gemini, there is no specific token callback in langchain
+            return dummy_callback()
         else:
             return get_openai_callback()
 

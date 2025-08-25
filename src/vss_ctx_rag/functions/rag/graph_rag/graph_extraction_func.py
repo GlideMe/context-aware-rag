@@ -39,7 +39,7 @@ from vss_ctx_rag.utils.globals import (
     DEFAULT_EMBEDDING_PARALLEL_COUNT,
 )
 from vss_ctx_rag.functions.rag.graph_rag.constants import QUERY_TO_DELETE_UUID_GRAPH
-from vss_ctx_rag.utils.common_utils import is_claude_model
+from vss_ctx_rag.utils.common_utils import is_claude_model, is_gemini_model, dummy_callback
 
 
 class GraphExtractionFunc(Function):
@@ -129,9 +129,32 @@ class GraphExtractionFunc(Function):
                         if is_claude_model(model_name):
                             with get_bedrock_anthropic_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
+                        elif is_gemini_model(model_name):
+                            # For Gemini, there is no specific token callback in langchain
+                            with dummy_callback() as cb:
+                                await self.graph_extraction.acreate_graph(batch)
                         else:
                             with get_openai_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
+                        
+                        logger.info(
+                            "GraphRAG Creation for %d docs\n"
+                            "Total Tokens: %s, "
+                            "Prompt Tokens: %s, "
+                            "Completion Tokens: %s, "
+                            "Successful Requests: %s, "
+                            "Total Cost (USD): $%s"
+                            % (
+                                batch._batch_size,
+                                cb.total_tokens,
+                                cb.prompt_tokens,
+                                cb.completion_tokens,
+                                cb.successful_requests,
+                                cb.total_cost,
+                            ),
+                        )
+                        self.metrics.graph_create_tokens += cb.total_tokens
+                        self.metrics.graph_create_requests += cb.successful_requests
                         
                         logger.info(
                             "GraphRAG Creation for %d docs\n"
