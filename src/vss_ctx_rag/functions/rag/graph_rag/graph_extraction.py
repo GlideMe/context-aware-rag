@@ -466,7 +466,7 @@ class GraphExtraction:
     def fetch_entities_for_embedding(self):
         query = """
                 MATCH (e)
-                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL 
+                WHERE NOT (e:Chunk OR e:Document) AND e.embedding IS NULL AND e.id IS NOT NULL
                 RETURN elementId(e) AS elementId, e.id + " " + coalesce(e.description, "") AS text
                 """
         result = self.graph_db.graph_db.query(query)
@@ -474,7 +474,7 @@ class GraphExtraction:
             {"elementId": record["elementId"], "text": record["text"]}
             for record in result
         ]
-    
+
     async def update_embeddings(self, rows):
         with TimeMeasure("GraphExtraction/UpdatEmbding", "yellow"):
             logger.info("update embedding for entities")
