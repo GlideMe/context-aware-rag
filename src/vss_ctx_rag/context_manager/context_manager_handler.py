@@ -203,7 +203,6 @@ class ContextManagerHandler:
         logger.debug(
             f"Configuring init for {self._process_index} with config: {config}"
         )
-        
         # Init time Milvus DB config
         chat_config = copy.deepcopy(config.get("chat"))
         summ_config = copy.deepcopy(config.get("summarization"))

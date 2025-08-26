@@ -361,7 +361,7 @@ class BatchSummarization(Function):
                             )
                 doc_meta["batch_i"] = doc_i // self.batch_size
 
-                #logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
+                # logger.info("aprocess_doc() Add doc= %s doc_meta=%s", doc, doc_meta);
 
                 #if self.endless_use_grids_summ and doc != ".":
                     # Here we reset the image description that the RAG holds (e.g., "<0.00> <4.88> A boy in an orange shirt is dribbling a basketball and shooting at a basketball hoop.")
