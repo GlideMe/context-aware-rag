@@ -276,6 +276,12 @@ class ContextManagerProcess(mp_ctx.Process):
     def reset(self, state):
         self._queue.put({"reset": state})
 
+    def get_current_collection_name(self) -> str:
+        """Forward to the context manager handler."""
+        if hasattr(self, 'cm_handler') and self.cm_handler:
+            return self.cm_handler.get_current_collection_name()
+        return None
+
 
 class ReqInfo:
     def __init__(self, **entries):
@@ -378,3 +384,12 @@ class ContextManager:
     def reset(self, state):
         logger.debug(f"Resetting Context Manager index: {self._process_index}")
         return self.process.reset(state)
+
+    def get_current_collection_name(self) -> str:
+        """
+        Get the current Milvus collection name used by this context manager.
+        
+        Returns:
+            str: The collection name, or None if not available
+        """
+        return self.process.get_current_collection_name()

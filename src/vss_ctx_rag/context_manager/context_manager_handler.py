@@ -492,6 +492,17 @@ class ContextManagerHandler:
     def get_function(self, fname):
         return self._functions[fname] if fname in self._functions else None
 
+    def get_current_collection_name(self) -> str:
+        """
+        Get the current Milvus collection name used by this context manager.
+        
+        Returns:
+            str: The collection name, or None if Milvus DB is not initialized
+        """
+        if hasattr(self, 'milvus_db') and self.milvus_db:
+            return self.milvus_db.collection_name
+        return None
+
     def remove_function(self, fname: str):
         if fname in self._functions:
             logger.debug(
