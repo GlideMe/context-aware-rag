@@ -39,7 +39,7 @@ from vss_ctx_rag.utils.globals import (
     DEFAULT_EMBEDDING_PARALLEL_COUNT,
 )
 from vss_ctx_rag.functions.rag.graph_rag.constants import QUERY_TO_DELETE_UUID_GRAPH
-from vss_ctx_rag.utils.common_utils import is_claude_model
+from vss_ctx_rag.utils.common_utils import is_claude_model, is_gemini_model, dummy_callback
 
 
 class GraphExtractionFunc(Function):
@@ -128,6 +128,10 @@ class GraphExtractionFunc(Function):
                         model_name = self.get_param("llm", "model")                        
                         if is_claude_model(model_name):
                             with get_bedrock_anthropic_callback() as cb:
+                                await self.graph_extraction.acreate_graph(batch)
+                        elif is_gemini_model(model_name):
+                            # For Gemini, there is no specific token callback in langchain
+                            with dummy_callback() as cb:
                                 await self.graph_extraction.acreate_graph(batch)
                         else:
                             with get_openai_callback() as cb:

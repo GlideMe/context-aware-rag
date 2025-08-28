@@ -16,7 +16,7 @@
 import os
 import time
 from typing import Optional, Iterator, Dict, Any, List
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables.utils import ConfigurableField
@@ -26,10 +26,8 @@ from langchain_aws import ChatBedrock
 from vss_ctx_rag.base import Tool
 from vss_ctx_rag.utils.ctx_rag_logger import logger
 from vss_ctx_rag.utils.globals import DEFAULT_LLM_BASE_URL
-from vss_ctx_rag.utils.common_utils import (
-    is_openai_model,
-    is_claude_model,
-)
+from vss_ctx_rag.utils.common_utils import is_openai_model
+
 from langchain_core.runnables.base import Runnable
 from langchain_nvidia_ai_endpoints import register_model, Model, ChatNVIDIA
 
@@ -154,7 +152,7 @@ class ChatClaudeTool(LLMTool):
         # Extract parameters for ChatBedrock
         max_tokens = llm_params.get("max_tokens", 4096)
         temperature = llm_params.get("temperature", 0.1)
-        top_p = llm_params.get("top_p", 0.9)
+        top_p = llm_params.get("top_p", 0.7)
         
         logger.info(f"Initializing ChatBedrock client for model: {model_id}")
         
@@ -240,4 +238,99 @@ class ChatClaudeTool(LLMTool):
         # Update the LLM configuration
         self.llm = self.llm.with_config(configurable={"model_kwargs": current_kwargs})
         
-        logger.debug(f"Updated Claude LLM configuration: {current_kwargs}")
+        logger.debug(f"Updated Claude LLM configuration: top_p={self.llm.top_p}, temperature={self.llm.temperature}, max_tokens={self.llm.max_tokens}")
+
+
+
+class ChatGeminiTool(LLMTool):
+    def __init__(self, model=None, api_key=None, **llm_params) -> None:
+        
+        # Set default model if not provided - Flash is faster for testing, Pro for production
+        model_name = model or "models/gemini-2.5-flash"  # or "gemini-2.5-flash-exp"
+        
+        # Configure API key
+        api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "Google API key is required. Set GOOGLE_API_KEY environment variable "
+                "or pass api_key parameter."
+            )
+        
+        # Extract parameters for ChatGoogleGenerativeAI
+        max_tokens = llm_params.get("max_tokens", 4096)
+        temperature = llm_params.get("temperature", 0.1)
+        top_p = llm_params.get("top_p", 0.7)
+        
+        logger.info(f"Initializing ChatGoogleGenerativeAI for model: {model_name}")
+        
+        # Create ChatGoogleGenerativeAI 
+        gemini_llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            top_p=top_p
+        ).configurable_fields(
+            temperature=ConfigurableField(id="temperature"),
+            max_output_tokens=ConfigurableField(id="max_tokens"),
+            top_p=ConfigurableField(id="top_p")
+        )
+        
+        super().__init__(
+            llm=gemini_llm,
+            name="gemini_tool"
+        )
+        
+        # Enhanced warmup with retry logic
+        try:
+            if os.getenv("CA_RAG_ENABLE_WARMUP", "false").lower() == "true":
+                self.warmup(model_name)
+        except Exception as e:
+            logger.error(f"Error warming up Gemini LLM: {e}")
+            # Don't raise - allow initialization to continue for graceful degradation
+            logger.warning("Continuing without warmup - model will initialize on first use")
+    
+    def warmup(self, model_name):
+        """Warm up the Gemini model with retry logic for reliability."""
+        max_warmup_attempts = 3
+        
+        for attempt in range(max_warmup_attempts):
+            try:
+                logger.info(f"Warming up Gemini LLM {model_name} (attempt {attempt + 1}/{max_warmup_attempts})")
+                
+                # Use a simple, cost-effective warmup prompt
+                warmup_response = self.invoke("Hello")
+                
+                logger.info(f"Gemini warmup successful: {str(warmup_response)[:100]}...")
+                return
+                
+            except Exception as e:
+                if attempt < max_warmup_attempts - 1:
+                    logger.warning(f"Warmup attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    logger.error(f"All warmup attempts failed for {model_name}: {e}")
+                    raise
+
+    def update(self, top_p=None, temperature=None, max_tokens=None):
+        """Update Gemini model configuration with validation and optimization."""
+        configurable_dict = {}
+        
+        # Validate and optimize parameters for Gemini 2.5
+        if temperature is not None:
+            temperature = max(0.0, min(1.0, float(temperature)))  # Clamp to valid range
+            configurable_dict['temperature'] = temperature
+            
+        if max_tokens is not None:
+            # Optimize for Gemini 2.5's capabilities
+            max_tokens = max(1, min(32768, int(max_tokens)))  # Clamp to model limits
+            configurable_dict['max_tokens'] = max_tokens
+        
+        if top_p is not None:
+            top_p = max(0.0, min(1.0, float(top_p)))  # Clamp to valid range
+            configurable_dict['top_p'] = top_p
+        
+        # Update the LLM configuration
+        if configurable_dict:
+            self.llm = self.llm.with_config(configurable=configurable_dict)
+            logger.debug(f"Updated Gemini LLM configuration: {configurable_dict}")
